@@ -1,0 +1,6 @@
+[build]
+  dir = "backend/src"
+  plan = "nodejs"
+
+[start]
+  cmd = "npm start"
