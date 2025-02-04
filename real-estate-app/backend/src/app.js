@@ -18,6 +18,15 @@ const sendGridRoutes = require('./routes/sendgridRoutes');
 const emailTemplatesRoutes = require('./routes/emailTemplatesRoutes');
 
 
+// Allow CORS only for your Vercel frontend
+const corsOptions = {
+    origin: "https://real-estate-b3ida374t-amit-vishnois-projects.vercel.app",  // Replace with your Vercel frontend URL
+    methods: "GET,POST,PUT,DELETE",
+    credentials: true
+  };
+  
+  app.use(cors(corsOptions));
+
 // Middleware
 app.use(cors());
 app.use(bodyParser.json());
