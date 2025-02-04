@@ -1,0 +1,84 @@
+const mongoose = require('mongoose');
+
+const PropertySchema = new mongoose.Schema({
+    address: { type: String, required: true, trim: true },
+    propertyLink: { type: String, trim: true },
+    agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' }, // Link to Agent model
+    askingPrice: { type: String, trim: true },
+    rental: { type: String, trim: true },
+    rentalYield: { type: String, trim: true },
+
+    // Additional Property Details
+    bedrooms: { type: Number, default: 0 },
+    bathrooms: { type: Number, default: 0 },
+    carSpaces: { type: Number, default: 0 },
+    landSize: { type: String, trim: true },
+    propertyType: { type: String, trim: true },
+    yearBuilt: { type: String, trim: true },
+    features: [{ type: String }], // Array of features
+    councilRate: { type: String, trim: true },
+    insurance: { type: String, trim: true },
+    floodZone: { type: String, trim: true },
+    bushfireZone: { type: String, trim: true },
+    zoningType: { type: String, trim: true },
+    nearbySchools: [{ type: String }], // Array of nearby schools
+    publicTransport: [{ type: String }], // Array of transport links
+    marketTrends: { type: String, trim: true },
+
+    // Important Dates
+    offerClosingDate: { type: Date },
+    videoAvailableDate: { type: Date, default: null },
+    upcomingInspectionDate: { type: Date, default: null },
+    additionalDocsExpected: { type: Date, default: null },
+
+    // Condition & Renovation Info
+    propertyCondition: { type: String, trim: true },
+    potentialRenovations: { type: String, trim: true },
+
+    // Conversation Log
+    conversation: [
+        {
+            timestamp: { type: Date, default: Date.now },
+            content: { type: String, required: true },
+        }
+    ],
+
+    // **New: Notes Section**
+    notes: [
+        {
+            content: { type: String, required: true },
+            timestamp: { type: Date, default: Date.now },
+        }
+    ],
+
+    // Follow-Up Tasks (Only created when required)
+    followUpTasks: [
+        {
+            task: { type: String, required: true },
+            followUpDate: { type: Date, default: null },
+            reason: { type: String, required: true },
+            completed: { type: Boolean, default: false },
+        }
+    ],
+
+    // Status Tracking
+    currentStatus: {
+        type: String,
+        enum: ['available', 'sold'],
+        default: 'available',
+    },
+    decisionStatus: {
+        type: String,
+        enum: ["undecided", "pursue", "on_hold"],
+        default: "undecided",
+    },
+
+    // Soft Delete Fields
+    is_deleted: { type: Boolean, default: false },
+    deleted_at: { type: Date, default: null },
+
+
+
+}, { timestamps: true }); // Auto-generated createdAt & updatedAt fields
+
+module.exports = mongoose.model('Property', PropertySchema);

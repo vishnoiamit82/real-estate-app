@@ -1,0 +1,331 @@
+const express = require('express');
+const router = express.Router();
+const Property = require('../models/Property');
+
+const twilio = require('twilio');
+
+// Helper function to sanitize date values
+const parseDateOrNull = (dateString) => {
+    if (!dateString || dateString.toLowerCase() === "not provided") return null;
+    const parsedDate = new Date(dateString);
+    return isNaN(parsedDate.getTime()) ? null : parsedDate;
+};
+
+// Create a property (POST)
+router.post('/', async (req, res) => {
+    try {
+        // Sanitize incoming data
+        const sanitizedData = {
+            ...req.body,
+            videoAvailableDate: parseDateOrNull(req.body.videoAvailableDate),
+            upcomingInspectionDate: parseDateOrNull(req.body.upcomingInspectionDate),
+            additionalDocsExpected: parseDateOrNull(req.body.additionalDocsExpected),
+
+            // Ensure followUpTasks array is formatted correctly
+            followUpTasks: Array.isArray(req.body.followUpTasks)
+                ? req.body.followUpTasks.map(task => ({
+                    task: task.task,
+                    followUpDate: parseDateOrNull(task.followUpDate),
+                    reason: task.reason,
+                    completed: task.completed || false, // Default to false
+                }))
+                : [],
+        };
+
+        // Create new property
+        const property = new Property(sanitizedData);
+        await property.save();
+
+        res.status(201).json(property);
+    } catch (error) {
+        console.error('Error creating property:', error);
+        if (error.name === 'ValidationError') {
+            res.status(400).json({ message: 'Validation error', details: error.errors });
+        } else {
+            res.status(500).json({ message: 'Internal Server Error', error: error.message });
+        }
+    }
+});
+
+module.exports = router;
+
+
+// Fetch all properties
+
+router.get('/', async (req, res) => {
+    try {
+        const properties = await Property.find().populate('agentId', 'name email phoneNumber');
+        res.status(200).json(properties);
+    } catch (error) {
+        console.error('Error fetching properties:', error);
+        res.status(500).json({ message: 'Error fetching properties.' });
+    }
+});
+
+
+// Get property by ID
+router.get('/properties/:id', async (req, res) => {
+    try {
+        const property = await Property.findById(req.params.id).populate('agentId', 'name email phoneNumber');
+        if (!property) {
+            return res.status(404).json({ message: 'Property not found.' });
+        }
+        res.status(200).json(property);
+    } catch (error) {
+        console.error('Error fetching property:', error);
+        res.status(500).json({ message: 'Error fetching property.' });
+    }
+});
+
+
+// Add a note to a property
+router.post('/properties/:id/conversations', async (req, res) => {
+    try {
+        const { content } = req.body;
+        const property = await Property.findById(req.params.id);
+        if (!property) {
+            return res.status(404).json({ message: 'Property not found.' });
+        }
+        property.conversation.push({ content });
+        await property.save();
+        res.status(200).json(property);
+    } catch (error) {
+        console.error('Error adding conversation:', error);
+        res.status(500).json({ message: 'Error adding conversation.' });
+    }
+});
+
+
+// Get conversations for a property
+router.get('/:id/conversations', async (req, res) => {
+    try {
+        const property = await Property.findById(req.params.id);
+
+        if (!property) {
+            return res.status(404).json({ message: 'Property not found.' });
+        }
+
+        res.status(200).json(property.conversation || []);
+    } catch (error) {
+        console.error('Error fetching conversations:', error);
+        res.status(500).json({ message: 'Error fetching conversations.' });
+    }
+});
+
+// Add notes on property.
+router.post('/:id/notes', async (req, res) => {
+    try {
+        const { content } = req.body;
+        const property = await Property.findById(req.params.id);
+        if (!property) return res.status(404).json({ message: 'Property not found' });
+
+        const newNote = { content, timestamp: new Date() };
+        property.notes.push(newNote);
+        await property.save();
+
+        res.status(201).json(newNote);
+    } catch (error) {
+        console.error('Error adding note:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+router.get('/:id/notes', async (req, res) => {
+    try {
+        const property = await Property.findById(req.params.id);
+        if (!property) return res.status(404).json({ message: 'Property not found' });
+
+        res.json(property.notes || []);
+    } catch (error) {
+        console.error('Error fetching notes:', error);
+        res.status(500).json({ message: 'Server error' });
+    }
+});
+
+
+
+
+
+// Get a single property by ID
+router.get('/:id', async (req, res) => {
+    try {
+        const property = await Property.findById(req.params.id).populate('agentId', 'name email phoneNumber');
+        if (!property) {
+            return res.status(404).json({ message: 'Property not found.' });
+        }
+        res.status(200).json(property);
+    } catch (error) {
+        console.error('Error fetching property:', error);
+        res.status(500).json({ message: 'Error fetching property.' });
+    }
+});
+
+// Update a property by ID
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        // Find and update the property
+        const updatedProperty = await Property.findByIdAndUpdate(
+            id,
+            req.body, // Update fields from request body
+            { new: true, runValidators: true } // Return updated property & validate
+        ).populate('agentId', 'name email phoneNumber'); // Populate agent details
+
+        if (!updatedProperty) {
+            return res.status(404).json({ message: 'Property not found.' });
+        }
+
+        res.status(200).json(updatedProperty);
+    } catch (error) {
+        console.error('Error updating property:', error);
+        res.status(500).json({ message: 'Error updating property.' });
+    }
+});
+
+
+// Delete a property by ID
+router.delete('/:id', async (req, res) => {
+    try {
+        const property = await Property.findByIdAndDelete(req.params.id);
+        if (!property) {
+            return res.status(404).json({ message: 'Property not found' });
+        }
+        res.status(200).json({ message: 'Property deleted successfully' });
+    } catch (error) {
+        res.status(500).json({ message: 'Error deleting property', error });
+    }
+});
+
+// Soft delete a property
+router.patch('/:id/delete', async (req, res) => {
+    try {
+        const updatedProperty = await Property.findByIdAndUpdate(
+            req.params.id,
+            { is_deleted: true, deleted_at: new Date() },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedProperty) {
+            return res.status(404).json({ message: 'Property not found.' });
+        }
+
+        res.status(200).json({ message: `Property ${req.params.id} marked as deleted.`, updatedProperty });
+    } catch (error) {
+        console.error('Error marking property as deleted:', error);
+        res.status(500).json({ message: 'Error marking property as deleted.' });
+    }
+});
+
+// Restore a soft-deleted property
+router.patch('/:id/restore', async (req, res) => {
+    try {
+        const updatedProperty = await Property.findByIdAndUpdate(
+            req.params.id,
+            { is_deleted: false, deleted_at: null },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedProperty) {
+            return res.status(404).json({ message: 'Property not found.' });
+        }
+
+        res.status(200).json({ message: `Property ${req.params.id} restored.`, updatedProperty });
+    } catch (error) {
+        console.error('Error restoring property:', error);
+        res.status(500).json({ message: 'Error restoring property.' });
+    }
+});
+
+
+// Soft delete a property
+router.patch("/:id/delete", async (req, res) => {
+    const { id } = req.params;
+    await Property.update(
+        { is_deleted: true, deleted_at: new Date() },
+        { where: { id } }
+    );
+    res.json({ message: `Property ${id} marked as deleted.` });
+});
+
+// Restore a soft-deleted property
+router.patch("/:id/restore", async (req, res) => {
+    const { id } = req.params;
+    await Property.update(
+        { is_deleted: false, deleted_at: null },
+        { where: { id } }
+    );
+    res.json({ message: `Property ${id} restored.` });
+});
+
+
+// Update decisionStatus for a property
+router.patch('/:id/decision', async (req, res) => {
+    try {
+        const { decisionStatus } = req.body;
+        if (!["undecided", "pursue", "on_hold"].includes(decisionStatus)) {
+            return res.status(400).json({ message: "Invalid decision status." });
+        }
+
+        const property = await Property.findByIdAndUpdate(
+            req.params.id,
+            { decisionStatus },
+            { new: true }
+        );
+
+        if (!property) {
+            return res.status(404).json({ message: "Property not found." });
+        }
+
+        res.status(200).json(property);
+    } catch (error) {
+        console.error("Error updating decision status:", error);
+        res.status(500).json({ message: "Failed to update decision status." });
+    }
+});
+
+
+
+
+// Twilio Configuration
+const accountSid = process.env.TWILIO_ACCOUNT_SID;
+const authToken = process.env.TWILIO_AUTH_TOKEN;
+const client = twilio(accountSid, authToken);
+
+// Send SMS to agent
+router.post('/:id/send-sms', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { message } = req.body;
+
+        const property = await Property.findById(id).populate('agentId');
+        if (!property || !property.agentId || !property.agentId.phoneNumber) {
+            return res.status(404).json({ message: 'Agent phone number not found.' });
+        }
+
+        const sms = await client.messages.create({
+            body: message,
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: property.agentId.phoneNumber,
+        });
+
+        // Save the SMS in the property's conversations
+        property.conversations.push({
+            message: `SMS Sent: ${message}`,
+            timestamp: new Date(),
+        });
+        await property.save();
+
+        res.status(200).json({ message: 'SMS sent successfully.', sms });
+    } catch (error) {
+        console.error('Error sending SMS:', error);
+        res.status(500).json({ message: 'Error sending SMS.' });
+    }
+});
+
+
+
+
+module.exports = router;
+
