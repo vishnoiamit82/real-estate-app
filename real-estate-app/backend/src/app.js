@@ -16,6 +16,8 @@ const taskRoutes = require('./routes/taskRoutes');
 const cashFlowRoutes = require('./routes/cashFlowRoutes');
 const sendGridRoutes = require('./routes/sendgridRoutes');
 const emailTemplatesRoutes = require('./routes/emailTemplatesRoutes');
+const emailRepliesRoutes = require('./routes/emailRepliesRoutes');
+emailRepliesRoutes
 
 
 // ✅ Enable CORS for both Local and Production
@@ -32,7 +34,7 @@ const corsOptions = {
             callback(new Error("Not allowed by CORS"));
         }
     },
-    methods: "GET,POST,PUT,DELETE",
+    methods: "GET,POST,PUT,DELETE,PATCH",
     credentials: true
 };
 
@@ -61,6 +63,8 @@ app.use('/follow-up-tasks', taskRoutes);
 app.use('/cashflow', cashFlowRoutes);
 app.use('/send-email', sendGridRoutes )
 app.use('/email-templates',emailTemplatesRoutes)
+app.use('/email-replies',emailRepliesRoutes)
+
 
 
 // Default route
