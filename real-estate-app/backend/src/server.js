@@ -1,7 +1,8 @@
 const app = require('./app');
 
-const PORT = process.env.PORT || 8080; // ✅ Use Fly.io PORT or fallback to 8080
+const PORT = process.env.NODE_ENV === "production" ? "8080" : "5001";
+const HOST = process.env.NODE_ENV === "production" ? "0.0.0.0" : "localhost";
 
-app.listen(PORT, "0.0.0.0", () => { // ✅ Ensure it listens on 0.0.0.0
-    console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+app.listen(PORT, HOST, () => {
+    console.log(`🚀 Server running on http://${HOST}:${PORT}`);
 });

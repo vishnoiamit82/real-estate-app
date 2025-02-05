@@ -18,13 +18,25 @@ const sendGridRoutes = require('./routes/sendgridRoutes');
 const emailTemplatesRoutes = require('./routes/emailTemplatesRoutes');
 
 
-// Allow CORS only for your Vercel frontend
+// ✅ Enable CORS for both Local and Production
+const allowedOrigins = [
+    "http://localhost:3000",  // Local frontend
+    "https://real-estate-b3ida374t-amit-vishnois-projects.vercel.app" // Production frontend
+];
+
 const corsOptions = {
-    origin: "https://real-estate-b3ida374t-amit-vishnois-projects.vercel.app",  // Replace with your Vercel frontend URL
+    origin: function (origin, callback) {
+        if (!origin || allowedOrigins.includes(origin)) {
+            callback(null, true);
+        } else {
+            callback(new Error("Not allowed by CORS"));
+        }
+    },
     methods: "GET,POST,PUT,DELETE",
     credentials: true
-  };
-  
+};
+
+
   app.use(cors(corsOptions));
 
 // Middleware
