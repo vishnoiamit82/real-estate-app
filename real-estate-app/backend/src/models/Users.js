@@ -1,22 +1,26 @@
+// models/User.js
 const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
 
-const UserSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema({
     name: { type: String, required: true },
     email: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    role: {
+    password: { type: String, required: true }, // Hashed password for authentication
+    phoneNumber: { type: String },
+    role: { 
+        type: String, 
+        enum: ['client', 'buyers_agent', 'sales_agent', 'external_partner', 'staff', 'admin'],
+        default: 'client'
+    },
+    subscriptionTier: {
         type: String,
-        enum: ['buyer_agent', 'client', 'buyer_agent_staff', 'shared_buyer_agent'],
-        required: true
-    }
+        enum: ['free', 'medium', 'premium'],
+        default: 'free'
+    },
+    permissions: [String],
+    agencyName: String, // For sales and buyer's agents
+    specialty: String, // For external partners (e.g., "Build and Pest", "Conveyancer")
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
 });
 
-// Hash password before saving
-UserSchema.pre('save', async function (next) {
-    if (!this.isModified('password')) return next();
-    this.password = await bcrypt.hash(this.password, 10);
-    next();
-});
-
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('User', userSchema);

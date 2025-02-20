@@ -1,24 +1,52 @@
+// authMiddleware.js
 const jwt = require('jsonwebtoken');
+const User = require('../models/Users');
 
-// Middleware to protect routes
-exports.authMiddleware = (req, res, next) => {
-    const token = req.header('Authorization');
+// Middleware for authentication (verifies JWT and sets req.user)
+const authMiddleware = async (req, res, next) => {
+    const token = req.headers.authorization?.split(' ')[1];
 
-    if (!token) return res.status(401).json({ message: 'Access denied. No token provided.' });
-
-    try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        req.user = decoded; // Add user data to request
-        next();
-    } catch (error) {
-        res.status(401).json({ message: 'Invalid token' });
+    
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            const user = await User.findById(decoded.id);
+            
+            if (!user) {
+                return res.status(404).json({ message: 'User not found' });
+            }
+            
+            req.user = user;
+            next();
+        } catch (error) {
+            return res.status(401).json({ message: 'Invalid token' });
+        }
+    } else {
+        console.warn('No token provided in request.');
+        return res.status(401).json({ message: 'No token provided' });
     }
 };
 
-// Role-based access control
-exports.roleMiddleware = (roles) => (req, res, next) => {
-    if (!roles.includes(req.user.role)) {
-        return res.status(403).json({ message: 'Access denied. Insufficient permissions.' });
-    }
-    next();
+// Middleware for authorization (checks user permissions)
+const authorize = (requiredPermissions = []) => {
+    return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({ message: 'Unauthorized' });
+        }
+
+        const hasPermission = requiredPermissions.every(permission =>
+            req.user.permissions.includes(permission)
+        );
+
+        if (!hasPermission) {
+            return res.status(403).json({ message: 'Access denied' });
+        }
+
+        next();
+    };
+};
+
+module.exports = {
+    authMiddleware,
+    authorize
 };

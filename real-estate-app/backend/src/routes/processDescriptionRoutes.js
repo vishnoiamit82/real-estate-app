@@ -57,7 +57,7 @@ router.post('/', async (req, res) => {
         `;
 
         // Call OpenAI API
-        const response = await axios.post(
+        const response = await axiosInstance.post(
             'https://api.openai.com/v1/chat/completions',
             {
                 model: 'gpt-3.5-turbo',

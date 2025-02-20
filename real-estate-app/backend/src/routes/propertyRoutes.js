@@ -63,37 +63,37 @@ router.get('/', async (req, res) => {
 });
 
 
-// Get property by ID
-router.get('/properties/:id', async (req, res) => {
-    try {
-        const property = await Property.findById(req.params.id).populate('agentId', 'name email phoneNumber');
-        if (!property) {
-            return res.status(404).json({ message: 'Property not found.' });
-        }
-        res.status(200).json(property);
-    } catch (error) {
-        console.error('Error fetching property:', error);
-        res.status(500).json({ message: 'Error fetching property.' });
-    }
-});
+// // Get property by ID
+// router.get('/properties/:id', async (req, res) => {
+//     try {
+//         const property = await Property.findById(req.params.id).populate('agentId', 'name email phoneNumber');
+//         if (!property) {
+//             return res.status(404).json({ message: 'Property not found.' });
+//         }
+//         res.status(200).json(property);
+//     } catch (error) {
+//         console.error('Error fetching property:', error);
+//         res.status(500).json({ message: 'Error fetching property.' });
+//     }
+// });
 
 
 // Add a note to a property
-router.post('/properties/:id/conversations', async (req, res) => {
-    try {
-        const { content } = req.body;
-        const property = await Property.findById(req.params.id);
-        if (!property) {
-            return res.status(404).json({ message: 'Property not found.' });
-        }
-        property.conversation.push({ content });
-        await property.save();
-        res.status(200).json(property);
-    } catch (error) {
-        console.error('Error adding conversation:', error);
-        res.status(500).json({ message: 'Error adding conversation.' });
-    }
-});
+// router.post('/properties/:id/conversations', async (req, res) => {
+//     try {
+//         const { content } = req.body;
+//         const property = await Property.findById(req.params.id);
+//         if (!property) {
+//             return res.status(404).json({ message: 'Property not found.' });
+//         }
+//         property.conversation.push({ content });
+//         await property.save();
+//         res.status(200).json(property);
+//     } catch (error) {
+//         console.error('Error adding conversation:', error);
+//         res.status(500).json({ message: 'Error adding conversation.' });
+//     }
+// });
 
 
 // Get conversations for a property

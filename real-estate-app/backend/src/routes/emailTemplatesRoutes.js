@@ -6,6 +6,9 @@ const EmailTemplate = require('../models/EmailTemplates');
 
 // Get all email templates
 router.get('/', async (req, res) => {
+    console.log('Auth Middleware Passed. User:', req.user);
+    console.log('Request Headers:', req.headers);
+    
     try {
         const templates = await EmailTemplate.find();
         res.json(templates);
