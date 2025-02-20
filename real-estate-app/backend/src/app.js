@@ -23,7 +23,7 @@ emailRepliesRoutes
 // ✅ Enable CORS for both Local and Production
 const allowedOrigins = [
     "http://localhost:3000",  // Local frontend
-    "https://real-estate-b3ida374t-amit-vishnois-projects.vercel.app" // Production frontend
+    "https://real-estate-fpnomlqop-amit-vishnois-projects.vercel.app/" // Production frontend
 ];
 
 const corsOptions = {
