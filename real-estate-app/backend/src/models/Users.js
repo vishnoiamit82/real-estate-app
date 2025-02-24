@@ -8,8 +8,8 @@ const userSchema = new mongoose.Schema({
     phoneNumber: { type: String },
     role: { 
         type: String, 
-        enum: ['client', 'buyers_agent', 'sales_agent', 'external_partner', 'staff', 'admin'],
-        default: 'client'
+        enum: ['client', 'buyers_agent', 'sales_agent', 'external_partner', 'staff', 'admin', 'property_sourcer'],
+        default: 'property_sourcer'
     },
     subscriptionTier: {
         type: String,

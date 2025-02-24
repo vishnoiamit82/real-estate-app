@@ -3,7 +3,7 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/Users');
 const bcrypt = require('bcrypt');
-const { PERMISSIONS } = require('../config/permissions');
+const { getPermissions } = require('../config/permissions');
 
 // POST /api/signup (Public endpoint for self-signup, default role is "client")
 router.post('/', async (req, res) => {
@@ -17,9 +17,9 @@ router.post('/', async (req, res) => {
             email,
             password: hashedPassword,
             phoneNumber,
-            role: 'client', // Default role
+            role: 'property_sourcer', // Default role
             subscriptionTier: 'free',
-            permissions: PERMISSIONS['free']
+            permissions: getPermissions("property_sourcer","free") || []
         });
 
         await user.save();

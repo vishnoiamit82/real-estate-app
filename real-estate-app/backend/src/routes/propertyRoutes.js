@@ -1,6 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const Property = require('../models/Property');
+const { authMiddleware } = require('../middlewares/authMiddleware'); // Ensure you have this middleware
+const crypto = require('crypto');
 
 const twilio = require('twilio');
 
@@ -11,12 +13,12 @@ const parseDateOrNull = (dateString) => {
     return isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
 
-// Create a property (POST)
-router.post('/', async (req, res) => {
+router.post('/', authMiddleware, async (req, res) => {
     try {
-        // Sanitize incoming data
+        // Sanitize incoming data and attach the logged-in user's id as createdBy
         const sanitizedData = {
             ...req.body,
+            createdBy: req.user._id, // Set createdBy to the logged-in user's id
             videoAvailableDate: parseDateOrNull(req.body.videoAvailableDate),
             upcomingInspectionDate: parseDateOrNull(req.body.upcomingInspectionDate),
             additionalDocsExpected: parseDateOrNull(req.body.additionalDocsExpected),
@@ -36,6 +38,9 @@ router.post('/', async (req, res) => {
         const property = new Property(sanitizedData);
         await property.save();
 
+        // Populate the createdBy field with selected fields (e.g., name, email, phoneNumber)
+        await property.populate('createdBy', 'name email phoneNumber');
+        
         res.status(201).json(property);
     } catch (error) {
         console.error('Error creating property:', error);
@@ -47,20 +52,125 @@ router.post('/', async (req, res) => {
     }
 });
 
+
 module.exports = router;
 
 
 // Fetch all properties
 
-router.get('/', async (req, res) => {
+// router.get('/', async (req, res) => {
+//     try {
+//         const properties = await Property.find().populate('agentId', 'name email phoneNumber');
+//         res.status(200).json(properties);
+//     } catch (error) {
+//         console.error('Error fetching properties:', error);
+//         res.status(500).json({ message: 'Error fetching properties.' });
+//     }
+// });
+
+
+router.get('/', authMiddleware, async (req, res) => {
     try {
-        const properties = await Property.find().populate('agentId', 'name email phoneNumber');
-        res.status(200).json(properties);
+        const currentUserId = req.user._id;
+        console.log("currentUserId-->", currentUserId);
+
+        let properties;
+        if (req.user.role === 'admin') {
+            // Admin: Return all properties without privacy filters
+            properties = await Property.find().populate('agentId', 'name email phoneNumber');
+        } else {
+            // Non-admin: Filter properties based on privacy rules:
+            // 1. publicListing is true, OR
+            // 2. createdBy equals the current user, OR
+            // 3. sharedWith includes the current user.
+            properties = await Property.find({
+                $or: [
+                    { publicListing: true },
+                    { createdBy: currentUserId },
+                    { sharedWith: currentUserId }
+                ]
+            }).populate('agentId', 'name email phoneNumber');
+        }
+
+        console.log("Fetched properties:", properties);
+
+        let sanitizedProperties;
+        if (req.user.role === 'admin') {
+            // Admins see all details as-is
+            sanitizedProperties = properties;
+        } else {
+            // Non-admin users: hide address if showAddress is false and user is not owner/shared
+            sanitizedProperties = properties.map(property => {
+                const propObj = property.toObject();
+                const isOwner = String(propObj.createdBy) === String(currentUserId);
+                const isShared = propObj.sharedWith && propObj.sharedWith.some(id => String(id) === String(currentUserId));
+                if (!propObj.showAddress && !isOwner && !isShared) {
+                    propObj.address = "Address Hidden";
+                }
+                return propObj;
+            });
+        }
+
+        res.status(200).json(sanitizedProperties);
     } catch (error) {
         console.error('Error fetching properties:', error);
         res.status(500).json({ message: 'Error fetching properties.' });
     }
 });
+
+
+
+
+
+// Generate share link for a property
+router.post('/:id/share', authMiddleware, async (req, res) => {
+
+    try {
+        // console.log ("I am here")
+        const property = await Property.findById(req.params.id);
+        if (!property) {
+            return res.status(404).json({ message: 'Property not found.' });
+        }
+        // Ensure that only the owner can generate a share link
+        if (property.createdBy.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: 'You are not authorized to share this property.' });
+        }
+        // Generate a share token if it doesn't exist
+        if (!property.shareToken) {
+            property.shareToken = crypto.randomBytes(16).toString('hex');
+            await property.save();
+        }
+        // Build the share link. Make sure to define FRONTEND_URL in your environment variables.
+        const shareLink = `${process.env.FRONTEND_URL}/shared/${property.shareToken}`;
+        res.status(200).json({ shareLink });
+    } catch (error) {
+        console.error('Error generating share link:', error);
+        res.status(500).json({ message: 'Error generating share link.' });
+    }
+});
+
+
+// routes/propertyRoutes.js (continued)
+router.get('/shared/:shareToken', async (req, res) => {
+    try {
+        const property = await Property.findOne({ shareToken: req.params.shareToken })
+            .populate('agentId', 'name email phoneNumber')
+            .populate('createdBy', 'name email');
+        if (!property) {
+            return res.status(404).json({ message: 'Property not found or link expired.' });
+        }
+        // Optionally sanitize details (e.g., hide address if showAddress is false for non-owners)
+        // For public viewing, you might simply send all non-sensitive info.
+        res.status(200).json(property);
+    } catch (error) {
+        console.error('Error retrieving shared property:', error);
+        res.status(500).json({ message: 'Error retrieving property.' });
+    }
+});
+
+
+
+
 
 
 // // Get property by ID

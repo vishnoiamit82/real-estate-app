@@ -76,6 +76,20 @@ const PropertySchema = new mongoose.Schema({
     // Soft Delete Fields
     is_deleted: { type: Boolean, default: false },
     deleted_at: { type: Date, default: null },
+    
+    // New fields for visibility and privacy
+    publicListing: { type: Boolean, default: false }, // false means only owner/shared users can see it
+    showAddress: { type: Boolean, default: true }, // true means address is shown publicly
+
+    shareToken: { type: String, default: null },
+    
+
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+
+    
+
+    // // Array of users with whom this property is shared
+    // sharedWith: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
 
 
 

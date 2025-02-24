@@ -89,6 +89,7 @@ app.get('/', (req, res) => {
 
 // ✅ Handle 404 Errors for undefined routes
 app.use((req, res) => {
+    // console.log ("I am here")
     res.status(404).json({ message: '❌ API route not found' });
 });
 

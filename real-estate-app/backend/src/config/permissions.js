@@ -30,6 +30,10 @@ const ROLE_PERMISSIONS = {
     staff: [
         'view_property',
         'share_property'
+    ],
+    property_sourcer:[
+        'view_property',
+        'share_property'
     ]
 };
 

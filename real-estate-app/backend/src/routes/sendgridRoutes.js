@@ -9,10 +9,11 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 router.post('/', async (req, res) => {
     try {
         console.log (req.body)
-        const { to, propertyAddress, clientName, subject, message, attachments } = req.body;
+        const { to, cc, propertyAddress, clientName, subject, message, attachments } = req.body;
         
         const msg = {
             to,
+            cc,
             from: process.env.SENDGRID_FROM_EMAIL, // Your verified sender email
             subject: subject || propertyAddress,
             html: `<p>${message}</p>`,
