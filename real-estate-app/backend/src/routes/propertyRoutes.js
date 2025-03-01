@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const Property = require('../models/Property');
-const { authMiddleware } = require('../middlewares/authMiddleware'); // Ensure you have this middleware
+const { authMiddleware,authorize } = require('../middlewares/authMiddleware'); // Ensure you have this middleware
 const crypto = require('crypto');
 
 const twilio = require('twilio');
@@ -13,7 +13,7 @@ const parseDateOrNull = (dateString) => {
     return isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
 
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authMiddleware, authorize(['view_property']), async (req, res) => {
     try {
         // Sanitize incoming data and attach the logged-in user's id as createdBy
         const sanitizedData = {
@@ -53,23 +53,7 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 
-module.exports = router;
-
-
-// Fetch all properties
-
-// router.get('/', async (req, res) => {
-//     try {
-//         const properties = await Property.find().populate('agentId', 'name email phoneNumber');
-//         res.status(200).json(properties);
-//     } catch (error) {
-//         console.error('Error fetching properties:', error);
-//         res.status(500).json({ message: 'Error fetching properties.' });
-//     }
-// });
-
-
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authMiddleware, authorize(['view_property']),async (req, res) => {
     try {
         const currentUserId = req.user._id;
         console.log("currentUserId-->", currentUserId);
@@ -123,7 +107,7 @@ router.get('/', authMiddleware, async (req, res) => {
 
 
 // Generate share link for a property
-router.post('/:id/share', authMiddleware, async (req, res) => {
+router.post('/:id/share', authMiddleware,  authorize(['share_property']), async (req, res) => {
 
     try {
         // console.log ("I am here")
@@ -132,7 +116,7 @@ router.post('/:id/share', authMiddleware, async (req, res) => {
             return res.status(404).json({ message: 'Property not found.' });
         }
         // Ensure that only the owner can generate a share link
-        if (property.createdBy.toString() !== req.user._id.toString()) {
+        if (property.createdBy.toString() !== req.user._id.toString() ) {
             return res.status(403).json({ message: 'You are not authorized to share this property.' });
         }
         // Generate a share token if it doesn't exist
@@ -170,44 +154,8 @@ router.get('/shared/:shareToken', async (req, res) => {
 
 
 
-
-
-
-// // Get property by ID
-// router.get('/properties/:id', async (req, res) => {
-//     try {
-//         const property = await Property.findById(req.params.id).populate('agentId', 'name email phoneNumber');
-//         if (!property) {
-//             return res.status(404).json({ message: 'Property not found.' });
-//         }
-//         res.status(200).json(property);
-//     } catch (error) {
-//         console.error('Error fetching property:', error);
-//         res.status(500).json({ message: 'Error fetching property.' });
-//     }
-// });
-
-
-// Add a note to a property
-// router.post('/properties/:id/conversations', async (req, res) => {
-//     try {
-//         const { content } = req.body;
-//         const property = await Property.findById(req.params.id);
-//         if (!property) {
-//             return res.status(404).json({ message: 'Property not found.' });
-//         }
-//         property.conversation.push({ content });
-//         await property.save();
-//         res.status(200).json(property);
-//     } catch (error) {
-//         console.error('Error adding conversation:', error);
-//         res.status(500).json({ message: 'Error adding conversation.' });
-//     }
-// });
-
-
 // Get conversations for a property
-router.get('/:id/conversations', async (req, res) => {
+router.get('/:id/conversations', authMiddleware,authorize(['view_conversations']),async (req, res) => {
     try {
         const property = await Property.findById(req.params.id);
 
@@ -223,7 +171,7 @@ router.get('/:id/conversations', async (req, res) => {
 });
 
 // Add notes on property.
-router.post('/:id/notes', async (req, res) => {
+router.post('/:id/notes', authMiddleware,authorize(['create_notes']), async (req, res) => {
     try {
         const { content } = req.body;
         const property = await Property.findById(req.params.id);
@@ -241,7 +189,7 @@ router.post('/:id/notes', async (req, res) => {
 });
 
 
-router.get('/:id/notes', async (req, res) => {
+router.get('/:id/notes',  authMiddleware,authorize(['get_notes']), async (req, res) => {
     try {
         const property = await Property.findById(req.params.id);
         if (!property) return res.status(404).json({ message: 'Property not found' });
@@ -258,7 +206,7 @@ router.get('/:id/notes', async (req, res) => {
 
 
 // Get a single property by ID
-router.get('/:id', async (req, res) => {
+router.get('/:id',  authMiddleware,authorize(['view_property']), async (req, res) => {
     try {
         const property = await Property.findById(req.params.id).populate('agentId', 'name email phoneNumber');
         if (!property) {
@@ -272,7 +220,7 @@ router.get('/:id', async (req, res) => {
 });
 
 // Update a property by ID
-router.put('/:id', async (req, res) => {
+router.put('/:id',  authMiddleware,authorize(['update_property']), async (req, res) => {
     try {
         const { id } = req.params;
 
@@ -296,7 +244,7 @@ router.put('/:id', async (req, res) => {
 
 
 // Delete a property by ID
-router.delete('/:id', async (req, res) => {
+router.delete('/:id',  authMiddleware,authorize(['delete_property']),async (req, res) => {
     try {
         const property = await Property.findByIdAndDelete(req.params.id);
         if (!property) {
@@ -309,7 +257,7 @@ router.delete('/:id', async (req, res) => {
 });
 
 // Soft delete a property
-router.patch('/:id/delete', async (req, res) => {
+router.patch('/:id/delete',  authMiddleware,authorize(['update_property']),async (req, res) => {
     try {
         const updatedProperty = await Property.findByIdAndUpdate(
             req.params.id,
@@ -329,7 +277,7 @@ router.patch('/:id/delete', async (req, res) => {
 });
 
 // Restore a soft-deleted property
-router.patch('/:id/restore', async (req, res) => {
+router.patch('/:id/restore', authMiddleware, authorize(['restore_property']), async (req, res) => {
     try {
         const updatedProperty = await Property.findByIdAndUpdate(
             req.params.id,
@@ -349,29 +297,29 @@ router.patch('/:id/restore', async (req, res) => {
 });
 
 
-// Soft delete a property
-router.patch("/:id/delete", async (req, res) => {
-    const { id } = req.params;
-    await Property.update(
-        { is_deleted: true, deleted_at: new Date() },
-        { where: { id } }
-    );
-    res.json({ message: `Property ${id} marked as deleted.` });
-});
+// // Soft delete a property
+// router.patch("/:id/delete", async (req, res) => {
+//     const { id } = req.params;
+//     await Property.update(
+//         { is_deleted: true, deleted_at: new Date() },
+//         { where: { id } }
+//     );
+//     res.json({ message: `Property ${id} marked as deleted.` });
+// });
 
-// Restore a soft-deleted property
-router.patch("/:id/restore", async (req, res) => {
-    const { id } = req.params;
-    await Property.update(
-        { is_deleted: false, deleted_at: null },
-        { where: { id } }
-    );
-    res.json({ message: `Property ${id} restored.` });
-});
+// // Restore a soft-deleted property
+// router.patch("/:id/restore", async (req, res) => {
+//     const { id } = req.params;
+//     await Property.update(
+//         { is_deleted: false, deleted_at: null },
+//         { where: { id } }
+//     );
+//     res.json({ message: `Property ${id} restored.` });
+// });
 
 
 // Update decisionStatus for a property
-router.patch('/:id/decision', async (req, res) => {
+router.patch('/:id/decision',authMiddleware, async (req, res) => {
     try {
         const { decisionStatus } = req.body;
         if (!["undecided", "pursue", "on_hold"].includes(decisionStatus)) {
@@ -404,7 +352,7 @@ const authToken = process.env.TWILIO_AUTH_TOKEN;
 const client = twilio(accountSid, authToken);
 
 // Send SMS to agent
-router.post('/:id/send-sms', async (req, res) => {
+router.post('/:id/send-sms',  authMiddleware,authorize(['send_sms']), async (req, res) => {
     try {
         const { id } = req.params;
         const { message } = req.body;

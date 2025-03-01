@@ -3,10 +3,12 @@ const express = require('express');
 const router = express.Router();
 const User = require('../models/Users');
 const bcrypt = require('bcrypt');
-const { getPermissions } = require('../config/permissions');
+const { getPermissions,ROLE_PERMISSIONS } = require('../config/permissions');
+const { authMiddleware, authorize } = require('../middlewares/authMiddleware'); //
+// PUT /api/users/:id - Update user roles, permissions, and subscription
 
 // POST /api/users (Admin creates any type of user)
-router.post('/', async (req, res) => {
+router.post('/', authMiddleware, authorize(['manage_users']), async (req, res) => {
     try {
         const { name, email, password, phoneNumber, role, subscriptionTier, agencyName, specialty } = req.body;
 
@@ -20,7 +22,7 @@ router.post('/', async (req, res) => {
             phoneNumber,
             role,
             subscriptionTier,
-            permissions: getPermissions(role,subscriptionTier) || [],
+            permissions: getPermissions(role, subscriptionTier) || [],
             agencyName,
             specialty
         });
@@ -33,9 +35,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-
 // GET /api/users (Admin-only access)
-router.get('/', async (req, res) => {
+router.get('/', authMiddleware, authorize(['view_users']), async (req, res) => {
     try {
         const users = await User.find();
         res.json(users);
@@ -45,5 +46,56 @@ router.get('/', async (req, res) => {
     }
 });
 
+
+
+router.put('/:id', authMiddleware, authorize(['manage_users']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { role, subscriptionTier, permissions } = req.body;
+
+        // Find the user
+        const user = await User.findById(id);
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // If role is updated, sync permissions from ROLE_PERMISSIONS
+        if (role) {
+            user.role = role;
+            user.permissions = ROLE_PERMISSIONS[role] || [];
+        }
+
+        // If manually provided, allow permission overrides
+        if (permissions) {
+            user.permissions = permissions;
+        }
+
+        if (subscriptionTier) user.subscriptionTier = subscriptionTier;
+
+        await user.save();
+        res.status(200).json({ message: 'User updated successfully', user });
+    } catch (error) {
+        console.error('Error updating user:', error);
+        res.status(500).json({ message: 'Failed to update user' });
+    }
+});
+
+
+// DELETE /api/users/:id - Delete a user (Admin only)
+router.delete('/:id', authMiddleware, authorize(['manage_users']), async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deletedUser = await User.findByIdAndDelete(id);
+
+        if (!deletedUser) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({ message: 'User deleted successfully' });
+    } catch (error) {
+        console.error('Error deleting user:', error);
+        res.status(500).json({ message: 'Failed to delete user' });
+    }
+});
 
 module.exports = router;

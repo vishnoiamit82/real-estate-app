@@ -9,6 +9,8 @@ const app = express();
 
 // Middleware for authentication and authorization
 const { authMiddleware } = require('./middlewares/authMiddleware');
+const loggerMiddleware = require('./middlewares/loggerMiddleware');
+
 
 // ✅ Import routes
 const agentRoutes = require('./routes/agentRoutes');
@@ -46,10 +48,16 @@ const corsOptions = {
 
 // ✅ Apply Global Middleware
 app.use(cors(corsOptions));
-app.use(bodyParser.json());
+// app.use(bodyParser.json());
+
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
 
 // ✅ Apply Authentication Middleware Globally
 // app.use(authMiddleware);
+app.use(loggerMiddleware); 
+
 
 // ✅ Database connection
 mongoose
