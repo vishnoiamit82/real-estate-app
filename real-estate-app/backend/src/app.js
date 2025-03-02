@@ -30,7 +30,7 @@ const loginRoute = require('./routes/loginRoute');
 // ✅ CORS Configuration for Local and Production Environments
 const allowedOrigins = [
     'http://localhost:3000', // Local frontend
-    'https://real-estate-fpnomlqop-amit-vishnois-projects.vercel.app' // Production frontend
+    'https://buyers-agent-ui.vercel.app' // Production frontend
 ];
 
 const corsOptions = {
