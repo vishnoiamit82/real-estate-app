@@ -1,2 +1,3 @@
 node_modules/
-backend/src/.env
+backend/src/.env.local  
+backend/src/.env.production
