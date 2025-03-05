@@ -3,7 +3,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const cors = require('cors');
 const mongoose = require('mongoose');
-require('dotenv').config();
+const dotenv = require("dotenv");
+
+
 
 const app = express();
 
@@ -26,6 +28,17 @@ const emailRepliesRoutes = require('./routes/emailRepliesRoutes');
 const usersSignupRoutes = require('./routes/UsersSignupRoutes');
 const userRoutes = require('./routes/UserRoutes');
 const loginRoute = require('./routes/loginRoute');
+const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
+const resetPasswordRoutes = require('./routes/resetPasswordRoutes');
+
+
+// Load environment-specific `.env` file
+if (process.env.NODE_ENV === "production") {
+    dotenv.config({ path: ".env.production" });
+} else {
+    dotenv.config({ path: ".env.local" });
+}
+
 
 // ✅ CORS Configuration for Local and Production Environments
 const allowedOrigins = [
@@ -84,8 +97,8 @@ app.use('/api/send-email', authMiddleware, sendGridRoutes);
 app.use('/api/email-templates', authMiddleware, emailTemplatesRoutes);
 app.use('/api/email-replies', authMiddleware, emailRepliesRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
-
-
+app.use('/api/forgot-password', forgotPasswordRoutes);
+app.use('/api/reset-password', resetPasswordRoutes);
 
 
 

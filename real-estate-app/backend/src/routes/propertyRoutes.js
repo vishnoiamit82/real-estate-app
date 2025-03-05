@@ -13,6 +13,97 @@ const parseDateOrNull = (dateString) => {
     return isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
 
+
+// ✅ Fetch Due Diligence Status
+router.get('/:id/due-diligence', authorize(['view_property']), async (req, res) => {
+    try {
+        const property = await Property.findById(req.params.id).populate('createdBy', 'name email phoneNumber');
+
+        if (!property) {
+            return res.status(404).json({ message: "Property not found" });
+        }
+
+        res.json({
+            dueDiligence: property.dueDiligence,
+            createdBy: property.createdBy
+        });
+    } catch (error) {
+        console.error("Error fetching due diligence:", error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+});
+
+// ✅ Update Due Diligence Status (Only property creator can update)
+router.patch('/:id/due-diligence', authorize(['update_property']), async (req, res) => {
+    try {
+        const property = await Property.findById(req.params.id);
+
+        if (!property) {
+            return res.status(404).json({ message: "Property not found" });
+        }
+
+        // Ensure only the owner can update due diligence
+        if (property.createdBy.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ message: "Unauthorized to update this property" });
+        }
+
+        // Sanitize incoming data
+        const sanitizedData = {};
+        Object.keys(req.body).forEach(check => {
+            if (property.dueDiligence.hasOwnProperty(check)) {
+                sanitizedData[`dueDiligence.${check}`] = req.body[check];
+            }
+        });
+
+        // Update property with sanitized due diligence data
+        await Property.findByIdAndUpdate(req.params.id, { $set: sanitizedData }, { new: true });
+
+        res.json({
+            message: "Due diligence updated successfully",
+            dueDiligence: { ...property.dueDiligence, ...req.body }
+        });
+    } catch (error) {
+        console.error("Error updating due diligence:", error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+});
+
+
+// ✅ Validate if Due Diligence is Complete
+router.get('/:id/due-diligence/validate', authorize(['view_property']), async (req, res) => {
+    try {
+        const property = await Property.findById(req.params.id);
+
+        if (!property) {
+            return res.status(404).json({ message: "Property not found" });
+        }
+
+        // Extract due diligence fields & additionalChecks
+        const dueDiligenceFields = { ...property.dueDiligence };
+        const additionalChecks = dueDiligenceFields.additionalChecks || [];
+
+        // Remove 'additionalChecks' from the main object so it doesn't interfere with validation
+        delete dueDiligenceFields.additionalChecks;
+
+        // ✅ Check if all predefined due diligence checks are completed
+        const predefinedChecksComplete = Object.values(dueDiligenceFields).every(status => status === "completed");
+
+        // ✅ Check if all additional due diligence checks are completed
+        const additionalChecksComplete = additionalChecks.every(check => check.status === "completed");
+
+        // ✅ Overall validation: both predefined and additional checks must be completed
+        const allCompleted = predefinedChecksComplete && additionalChecksComplete;
+
+        res.json({
+            isComplete: allCompleted,
+            message: allCompleted ? "Due diligence is complete" : "Some checks are still pending"
+        });
+    } catch (error) {
+        console.error("Error validating due diligence:", error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
+    }
+});
+
 router.post('/', authMiddleware, authorize(['view_property']), async (req, res) => {
     try {
         // Sanitize incoming data and attach the logged-in user's id as createdBy
@@ -99,6 +190,35 @@ router.get('/', authMiddleware, authorize(['view_property']),async (req, res) =>
     } catch (error) {
         console.error('Error fetching properties:', error);
         res.status(500).json({ message: 'Error fetching properties.' });
+    }
+});
+
+// ✅ PATCH: Update Property Status
+router.patch('/:id/status', authMiddleware, authorize(['edit_property']), async (req, res) => {
+    try {
+        const { status } = req.body;
+
+        if (!['available', 'sold', 'offer_accepted'].includes(status)) {
+            return res.status(400).json({ message: "Invalid status value" });
+        }
+
+        const property = await Property.findById(req.params.id);
+        if (!property) {
+            return res.status(404).json({ message: "Property not found" });
+        }
+
+        // Only allow edits if not "offer_accepted" OR if admin
+        if (property.currentStatus === "offer_accepted" && req.user.role !== "admin") {
+            return res.status(403).json({ message: "Only admins can modify an accepted offer" });
+        }
+
+        property.currentStatus = status;
+        await property.save();
+
+        res.json({ message: "Property status updated successfully", property });
+    } catch (error) {
+        console.error("Error updating property status:", error);
+        res.status(500).json({ message: "Internal Server Error", error: error.message });
     }
 });
 

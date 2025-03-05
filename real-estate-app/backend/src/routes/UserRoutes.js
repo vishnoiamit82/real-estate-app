@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/Users');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { getPermissions,ROLE_PERMISSIONS } = require('../config/permissions');
 const { authMiddleware, authorize } = require('../middlewares/authMiddleware'); //
 // PUT /api/users/:id - Update user roles, permissions, and subscription

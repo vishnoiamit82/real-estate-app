@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/Users');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { getPermissions } = require('../config/permissions');
 
 // POST /api/signup (Public endpoint for self-signup, default role is "client")

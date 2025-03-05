@@ -1,6 +1,18 @@
 const express = require('express');
 const sgMail = require('@sendgrid/mail');
-require('dotenv').config();
+const dotenv = require("dotenv");
+
+
+console.log("✅ NODE_ENV:", process.env.NODE_ENV);
+
+
+// Load environment-specific `.env` file
+if (process.env.NODE_ENV === "production") {
+    dotenv.config({ path: ".env.production" });
+} else {
+    dotenv.config({ path: ".env.local" });
+}
+
 
 const router = express.Router();
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);

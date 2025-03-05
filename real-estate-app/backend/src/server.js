@@ -1,9 +1,31 @@
 const app = require('./app');
 // server.js
 const User = require('./models/Users');
-const bcrypt = require('bcrypt');
+const bcrypt = require("bcryptjs");
 const { ROLE_PERMISSIONS } = require('./config/permissions');
-require('dotenv').config();
+// require('dotenv').config();
+
+const dotenv = require("dotenv");
+
+
+console.log("✅ NODE_ENV:", process.env.NODE_ENV);
+
+
+// Load environment-specific `.env` file
+if (process.env.NODE_ENV === "production") {
+    dotenv.config({ path: ".env.production" });
+} else {
+    dotenv.config({ path: ".env.local" });
+}
+
+
+console.log("✅ FRONTEND_URL:", process.env.FRONTEND_URL);
+console.log("✅ ADMIN_EMAIL:", process.env.ADMIN_EMAIL ? process.env.ADMIN_EMAIL : "❌ NOT LOADED");
+console.log("✅ ADMIN_PASSWORD:", process.env.ADMIN_PASSWORD ? "Loaded" : "❌ NOT LOADED");
+console.log("✅ FRONTEND_URL:", process.env.FRONTEND_URL);
+console.log("✅ MONGO_URI:", process.env.MONGO_URI ? "Loaded" : "❌ Not Loaded");
+
+
 
 
 const PORT = process.env.NODE_ENV === "production" ? "8080" : "5001";

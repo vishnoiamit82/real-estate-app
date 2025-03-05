@@ -17,8 +17,13 @@ const userSchema = new mongoose.Schema({
         default: 'free'
     },
     permissions: [String],
+ 
     agencyName: String, // For sales and buyer's agents
     specialty: String, // For external partners (e.g., "Build and Pest", "Conveyancer")
+
+    // 🔹 Add Password Reset Token Fields
+    resetToken: { type: String },  
+    resetTokenExpiration: { type: Date },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });

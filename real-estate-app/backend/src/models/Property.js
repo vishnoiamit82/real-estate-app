@@ -64,7 +64,7 @@ const PropertySchema = new mongoose.Schema({
     // Status Tracking
     currentStatus: {
         type: String,
-        enum: ['available', 'sold'],
+        enum: ['available', 'sold', 'offer_accepted'],
         default: 'available',
     },
     decisionStatus: {
@@ -86,6 +86,18 @@ const PropertySchema = new mongoose.Schema({
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 
+      // **New: Due Diligence Object**
+    dueDiligence: {
+        insurance: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
+        floodZone: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
+        bushfireZone: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
+        socialHousing: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
+        // Allow dynamic fields for additional checks
+        additionalChecks: [{ 
+            name: { type: String, required: true },
+            status: { type: String, enum: ["pending", "completed", "failed"], default: "pending" }
+        }]
+    },
     
 
     // // Array of users with whom this property is shared

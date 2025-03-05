@@ -38,7 +38,7 @@ router.get(
         try {
             const searchQuery = req.query.search || '';
 
-            // Check if the user is an admin
+            // Check if the user is an admi
             const isAdmin = req.user && req.user.role === 'admin';
 
             // If not admin, enforce search query requirement
@@ -63,21 +63,26 @@ router.get(
 
 
 // Get a single agent by ID
-router.get('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const agent = await Agent.findById(id);
+router.get('/:id', (req, res, next) => {
+    req.route.settings = { permissions: ['view_agents'] };
+    next();
+    },
+    authorize(['view_agents']),
+    async (req, res) => {
+        try {
+            const { id } = req.params;
+            const agent = await Agent.findById(id);
 
-        if (!agent) {
-            return res.status(404).json({ message: 'Agent not found.' });
+            if (!agent) {
+                return res.status(404).json({ message: 'Agent not found.' });
+            }
+
+            res.status(200).json(agent);
+        } catch (error) {
+            console.error('Error fetching agent:', error);
+            res.status(500).json({ message: 'Error fetching agent.' });
         }
-
-        res.status(200).json(agent);
-    } catch (error) {
-        console.error('Error fetching agent:', error);
-        res.status(500).json({ message: 'Error fetching agent.' });
-    }
-});
+    });
 
 // Update an agent by ID
 router.put('/:id', async (req, res) => {

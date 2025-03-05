@@ -1,7 +1,19 @@
 // deleteAdminUser.js
 const mongoose = require('mongoose');
 const User = require('../models/Users'); // Ensure this path is correct
-require('dotenv').config();
+const dotenv = require("dotenv");
+
+
+console.log("✅ NODE_ENV:", process.env.NODE_ENV);
+
+
+// Load environment-specific `.env` file
+if (process.env.NODE_ENV === "production") {
+    dotenv.config({ path: ".env.production" });
+} else {
+    dotenv.config({ path: ".env.local" });
+}
+
 
 const deleteAdminUser = async () => {
     try {
