@@ -49,11 +49,14 @@ router.patch('/:id/due-diligence', authorize(['update_property']), async (req, r
 
         // Sanitize incoming data
         const sanitizedData = {};
-        Object.keys(req.body).forEach(check => {
-            if (property.dueDiligence.hasOwnProperty(check)) {
-                sanitizedData[`dueDiligence.${check}`] = req.body[check];
+
+        Object.keys(req.body.dueDiligence).forEach((key) => {
+            if (property.dueDiligence.hasOwnProperty(key)) {
+                sanitizedData[`dueDiligence.${key}`] = req.body.dueDiligence[key];
             }
         });
+
+        
 
         // Update property with sanitized due diligence data
         await Property.findByIdAndUpdate(req.params.id, { $set: sanitizedData }, { new: true });
