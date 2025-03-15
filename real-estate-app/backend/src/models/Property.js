@@ -83,6 +83,9 @@ const PropertySchema = new mongoose.Schema({
     showAddress: { type: Boolean, default: true }, // true means address is shown publicly
 
     shareToken: { type: String, default: null },
+    isCommunityShared: { type: Boolean, default: false },
+    sharedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
     
 
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },

@@ -30,6 +30,8 @@ const userRoutes = require('./routes/UserRoutes');
 const loginRoute = require('./routes/loginRoute');
 const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const resetPasswordRoutes = require('./routes/resetPasswordRoutes');
+const savedPropertyRoutes = require('./routes/savedPropertyRoutes');
+const sharedPropertyRoute = require('./routes/sharedPropertyRoute');
 
 
 // Load environment-specific `.env` file
@@ -84,6 +86,8 @@ mongoose
 // ✅ Public routes (No authentication required)
 app.use('/api/login', loginRoute);
 app.use('/api/signup', usersSignupRoutes);
+app.use('/api/shared', sharedPropertyRoute);
+
 
 // ✅ Protected routes (Require authentication)
 app.use('/api/agents', authMiddleware, agentRoutes);
@@ -99,6 +103,9 @@ app.use('/api/email-replies', authMiddleware, emailRepliesRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
 app.use('/api/forgot-password', forgotPasswordRoutes);
 app.use('/api/reset-password', resetPasswordRoutes);
+
+// app.use('/api/saved-properties', savedPropertyRoutes);
+
 
 
 

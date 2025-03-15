@@ -17,6 +17,11 @@ const userSchema = new mongoose.Schema({
         default: 'free'
     },
     permissions: [String],
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+      },
+      
  
     agencyName: String, // For sales and buyer's agents
     specialty: String, // For external partners (e.g., "Build and Pest", "Conveyancer")

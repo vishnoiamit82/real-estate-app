@@ -13,6 +13,56 @@ const parseDateOrNull = (dateString) => {
     return isNaN(parsedDate.getTime()) ? null : parsedDate;
 };
 
+// PATCH /properties/:id/share-to-community
+router.patch('/:id/share-to-community', async (req, res) => {
+    try {
+      const property = await Property.findById(req.params.id);
+  
+      if (!property) return res.status(404).json({ message: 'Property not found' });
+  
+      if (property.createdBy.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ message: 'Unauthorized to share this property' });
+      }
+  
+      property.isCommunityShared = true;
+      property.sharedBy = req.user._id;
+  
+      await property.save();
+  
+      return res.status(200).json({ message: 'Property shared to community successfully.' });
+    } catch (err) {
+      console.error('Error sharing property:', err);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+
+
+  router.patch('/:id/unshare-from-community', async (req, res) => {
+    try {
+      const property = await Property.findById(req.params.id);
+  
+      if (!property) return res.status(404).json({ message: 'Property not found' });
+  
+      if (property.createdBy.toString() !== req.user._id.toString()) {
+        return res.status(403).json({ message: 'Unauthorized to unshare this property' });
+      }
+  
+      property.isCommunityShared = false;
+      property.sharedBy = null;
+  
+      await property.save();
+  
+      return res.status(200).json({ message: 'Property unshared from community successfully.' });
+    } catch (err) {
+      console.error('Error unsharing property:', err);
+      return res.status(500).json({ message: 'Internal Server Error' });
+    }
+  });
+  
+
+  
+  
+
 
 // ✅ Fetch Due Diligence Status
 router.get('/:id/due-diligence', authorize(['view_property']), async (req, res) => {
@@ -145,6 +195,30 @@ router.post('/', authMiddleware, authorize(['view_property']), async (req, res) 
         }
     }
 });
+
+router.get('/community', authMiddleware, async (req, res) => {
+    try {
+      const properties = await Property.find({
+        isCommunityShared: true,
+        is_deleted: false, 
+        sharedBy: { $ne: null }
+      })
+      .populate('sharedBy', 'name email');
+  
+      const sanitized = properties.map((prop) => {
+        const obj = prop.toObject();
+        delete obj.agentId; // 👈 Remove agent data
+        return obj;
+      });
+  
+      res.json(sanitized);
+
+    } catch (error) {
+      console.error('Error fetching community properties:', error);
+      res.status(500).json({ message: 'Error fetching community properties.' });
+    }
+  });
+  
 
 
 router.get('/', authMiddleware, authorize(['view_property']),async (req, res) => {
