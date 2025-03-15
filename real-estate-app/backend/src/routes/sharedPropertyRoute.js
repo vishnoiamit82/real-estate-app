@@ -13,7 +13,8 @@ router.get('/:shareToken', async (req, res) => {
         }
         // Optionally sanitize details (e.g., hide address if showAddress is false for non-owners)
         // For public viewing, you might simply send all non-sensitive info.
-        res.status(200).json(property);
+        res.status(200).json(property.toObject());
+
     } catch (error) {
         console.error('Error retrieving shared property:', error);
         res.status(500).json({ message: 'Error retrieving property.' });

@@ -12,6 +12,7 @@ const app = express();
 // Middleware for authentication and authorization
 const { authMiddleware } = require('./middlewares/authMiddleware');
 const loggerMiddleware = require('./middlewares/loggerMiddleware');
+const sanitizeResponseMiddleware = require('./middlewares/sanitizeResponse');
 
 
 // ✅ Import routes
@@ -68,6 +69,7 @@ app.use(cors(corsOptions));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+app.use(sanitizeResponseMiddleware);
 
 // ✅ Apply Authentication Middleware Globally
 // app.use(authMiddleware);
@@ -126,5 +128,7 @@ app.use((err, req, res, next) => {
     console.error('❌ Global Error:', err.message);
     res.status(500).json({ message: '❌ Internal Server Error' });
 });
+
+
 
 module.exports = app;
