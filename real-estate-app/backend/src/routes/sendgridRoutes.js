@@ -26,15 +26,15 @@ sgClient.setApiKey(process.env.SENDGRID_API_KEY);
 router.post('/', async (req, res) => {
     try {
         console.log(req)
-        const { to, cc, propertyAddress, clientName, subject, message, attachments } = req.body;
+        const { to, cc, propertyAddress, clientName, subject, message, attachments,propertyId } = req.body;
 
         const msg = {
             to,
             cc,
             from: process.env.SENDGRID_FROM_EMAIL, // Your verified sender email
-            replyTo: cc,
+            replyTo: "info@replies.nationalpropertyconsultant.com.au",
             subject: subject || propertyAddress,
-            html: `<p>${message}</p>`,
+            html: `${message}<div style="display:none;color:#fefefe;font-size:1px;">[ref:propertyId=${propertyId}]</div>`,
             attachments: attachments?.map(file => ({
                 content: file.base64,
                 filename: file.filename,
@@ -43,6 +43,7 @@ router.post('/', async (req, res) => {
             })) || []
         };
 
+        console.log('💌 Final email HTML sent:', msg.html);
         await sgMail.send(msg);
         res.status(200).json({ success: true, message: 'Email sent successfully!' });
     } catch (error) {

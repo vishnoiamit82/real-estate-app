@@ -1,29 +1,59 @@
 const express = require('express');
+const multer = require('multer');
+const upload = multer(); // no storage needed for now
 const router = express.Router();
-const EmailTemplate = require('../models/EmailReply.js');
+const PropertyConversation = require('../models/PropertyConversation');
 
-router.post('/', async (req, res) => {
-    try {
-        const { from, to, subject, text, html } = req.body;
+router.post('/', upload.any(), async (req, res) => {
+  try {
+    const parsedFields = {};
+    req.body.forEach((field, index) => {
+      // SendGrid sends it as field: value pairs
+      parsedFields[field.fieldname] = field.buffer?.toString('utf8') || '';
+    });
 
-        console.log('Received Email Reply:', { from, to, subject, text });
+    const from = parsedFields.from;
+    const to = parsedFields.to;
+    const subject = parsedFields.subject;
+    const html = parsedFields.html;
+    const text = parsedFields.text;
 
-        // Save the reply to the database (e.g., MongoDB)
-        const newReply = new EmailReply({
-            from,
-            to,
-            subject,
-            body: html || text,
-            receivedAt: new Date(),
-        });
-        await newReply.save();
+    console.log('✅ Parsed Fields:', parsedFields);
 
-        res.status(200).send('Email response recorded.');
-    } catch (error) {
-        console.error('Error processing email reply:', error);
-        res.status(500).send('Failed to process email reply.');
+    // Extract propertyId from hidden footer in html or text
+    let propertyId = null;
+    const htmlMatch = html?.match(/\[ref:propertyId=([a-zA-Z0-9]+)\]/i);
+    if (htmlMatch) propertyId = htmlMatch[1];
+    if (!propertyId && text) {
+      const textMatch = text.match(/\[ref:propertyId=([a-zA-Z0-9]+)\]/i);
+      if (textMatch) propertyId = textMatch[1];
     }
+
+    if (!propertyId) {
+      console.warn('❌ Unable to extract Property ID from reply.');
+      return res.status(400).json({ message: 'Property ID not found in reply.' });
+    }
+
+    const newConversation = new PropertyConversation({
+      propertyId,
+      type: 'email_reply',
+      from,
+      to,
+      subject,
+      content: html || text,
+      timestamp: new Date(),
+    });
+
+    await newConversation.save();
+
+    console.log('✅ Saved conversation reply:', { propertyId, subject });
+    res.status(200).send('Reply recorded.');
+  } catch (err) {
+    console.error('❌ Failed to process multipart email reply:', err);
+    res.status(500).send('Server error while processing reply');
+  }
 });
+
 
 // Fetch email replies for a specific email
 router.get('/email-replies', async (req, res) => {

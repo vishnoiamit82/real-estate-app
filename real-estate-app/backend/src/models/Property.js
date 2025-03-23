@@ -3,11 +3,13 @@ const mongoose = require('mongoose');
 const PropertySchema = new mongoose.Schema({
     address: { type: String, required: true, trim: true },
     isOffmarket: { type: Boolean, default: false },
+    subdivisionPotential: { type: Boolean, default: false },
     propertyLink: { type: String, trim: true },
     agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' }, // Link to Agent model
     askingPrice: { type: String, trim: true },
     rental: { type: String, trim: true },
     rentalYield: { type: String, trim: true },
+    
 
     // Additional Property Details
     bedrooms: { type: Number, default: 0 },

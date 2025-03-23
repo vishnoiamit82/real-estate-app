@@ -3,6 +3,7 @@ const router = express.Router();
 const Property = require('../models/Property');
 const { authMiddleware,authorize } = require('../middlewares/authMiddleware'); // Ensure you have this middleware
 const crypto = require('crypto');
+const ClientBrief = require('../models/ClientBriefs');
 
 const twilio = require('twilio');
 
@@ -162,19 +163,17 @@ router.post('/', authMiddleware, authorize(['view_property']), async (req, res) 
         // Sanitize incoming data and attach the logged-in user's id as createdBy
         const sanitizedData = {
             ...req.body,
-            createdBy: req.user._id, // Set createdBy to the logged-in user's id
+            createdBy: req.user._id,
             videoAvailableDate: parseDateOrNull(req.body.videoAvailableDate),
             upcomingInspectionDate: parseDateOrNull(req.body.upcomingInspectionDate),
             additionalDocsExpected: parseDateOrNull(req.body.additionalDocsExpected),
-
-            // Ensure followUpTasks array is formatted correctly
             followUpTasks: Array.isArray(req.body.followUpTasks)
                 ? req.body.followUpTasks.map(task => ({
-                    task: task.task,
-                    followUpDate: parseDateOrNull(task.followUpDate),
-                    reason: task.reason,
-                    completed: task.completed || false, // Default to false
-                }))
+                      task: task.task,
+                      followUpDate: parseDateOrNull(task.followUpDate),
+                      reason: task.reason,
+                      completed: task.completed || false,
+                  }))
                 : [],
         };
 
@@ -182,9 +181,26 @@ router.post('/', authMiddleware, authorize(['view_property']), async (req, res) 
         const property = new Property(sanitizedData);
         await property.save();
 
-        // Populate the createdBy field with selected fields (e.g., name, email, phoneNumber)
-        await property.populate('createdBy', 'name email phoneNumber');
+        // 🔍 Match against private client briefs belonging to this agent
+        const briefs = await ClientBrief.find({ buyerAgentId: req.user._id });
+
+        const matches = briefs.map(brief => ({
+            brief,
+            result: propertyMatchesClientBrief(property, brief)
+        }));
         
+        const matchedBriefs = matches.filter(m => m.result.isMatch);
+        
+        if (matchedBriefs.length > 0) {
+            console.log(`✅ Property matches ${matchedBriefs.length} client brief(s).`);
+            matchedBriefs.forEach(({ brief, result }) => {
+                console.log(`➡️ ${brief.clientName} | Match Score: ${result.matchScore}%`);
+            });
+        }
+
+        // Populate the createdBy field with selected fields
+        await property.populate('createdBy', 'name email phoneNumber');
+
         res.status(201).json(property);
     } catch (error) {
         console.error('Error creating property:', error);
@@ -195,6 +211,7 @@ router.post('/', authMiddleware, authorize(['view_property']), async (req, res) 
         }
     }
 });
+
 
 router.get('/community', authMiddleware, async (req, res) => {
     try {

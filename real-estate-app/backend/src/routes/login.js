@@ -6,34 +6,59 @@ const User = require('../models/User'); // Import User model
 const router = express.Router();
 
 // Login Route
-router.post('/login', async (req, res) => {
+// POST /api/login
+router.post('/', async (req, res) => {
+  try {
     const { email, password } = req.body;
 
-    try {
-        const user = await User.findOne({ email });
+    const user = await User.findOne({ email });
+    if (!user) return res.status(404).json({ message: 'User not found' });
 
-        if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+    const isPasswordValid = await bcrypt.compare(password, user.password);
+    if (!isPasswordValid) return res.status(401).json({ message: 'Invalid credentials' });
 
-        const isMatch = await bcrypt.compare(password, user.password);
-        if (!isMatch) return res.status(401).json({ message: 'Invalid credentials' });
+    // Create Access Token (short-lived)
+    const accessToken = jwt.sign(
+      {
+        id: user._id,
+        role: user.role,
+        permissions: user.permissions,
+        name: user.name,
+        isEmailVerified: user.isEmailVerified
+      },
+      process.env.JWT_SECRET,
+      { expiresIn: '15m' } // Short-lived
+    );
 
-        // Generate JWT Token
-        const token = jwt.sign(
-            {
-              id: user._id,
-              role: user.role,
-              isEmailVerified: user.isEmailVerified
-            },
-            process.env.JWT_SECRET,
-            { expiresIn: '1d' }
-          );
-          
+    // Create Refresh Token (long-lived)
+    const refreshToken = jwt.sign(
+      {
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        name: user.name
+      },
+      process.env.JWT_REFRESH_SECRET,
+      { expiresIn: '7d' } // You can adjust this
+    );
 
-        res.json({ token, role: user.role });
-    } catch (error) {
-        console.error('Error during login:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
+    res.json({
+      message: 'Login successful',
+      accessToken,
+      refreshToken, // ✅ Include this in response
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions
+      }
+    });
+  } catch (error) {
+    console.error('Error during login:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
 });
+
 
 module.exports = router;

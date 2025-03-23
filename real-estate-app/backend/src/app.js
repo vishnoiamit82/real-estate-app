@@ -33,6 +33,8 @@ const forgotPasswordRoutes = require('./routes/forgotPasswordRoutes');
 const resetPasswordRoutes = require('./routes/resetPasswordRoutes');
 const savedPropertyRoutes = require('./routes/savedPropertyRoutes');
 const sharedPropertyRoute = require('./routes/sharedPropertyRoute');
+const propertyConversationRoute = require('./routes/propertyConversationRoutes');
+const authRoutes = require('./routes/auth'); // contains /refresh endpoint
 
 
 // Load environment-specific `.env` file
@@ -101,12 +103,17 @@ app.use('/api/follow-up-tasks', authMiddleware, taskRoutes);
 app.use('/api/cashflow', authMiddleware, cashFlowRoutes);
 app.use('/api/send-email', authMiddleware, sendGridRoutes);
 app.use('/api/email-templates', authMiddleware, emailTemplatesRoutes);
-app.use('/api/email-replies', authMiddleware, emailRepliesRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
+
 app.use('/api/forgot-password', forgotPasswordRoutes);
 app.use('/api/reset-password', resetPasswordRoutes);
+app.use('/api/auth', authRoutes);
+app.use('/api/email-replies', emailRepliesRoutes);
 
-// app.use('/api/saved-properties', savedPropertyRoutes);
+
+app.use('/api/saved-properties', authMiddleware, savedPropertyRoutes);
+
+app.use('/api/property-conversations', authMiddleware, propertyConversationRoute);
 
 
 
