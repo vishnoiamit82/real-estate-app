@@ -55,17 +55,17 @@ const calculateMatchScore = (property, clientBrief) => {
     const loanAmount = price * (lvr / 100);
     const monthlyInterest = (loanAmount * (interestRate / 100)) / 12;
 
-    const insurance = parseFloat(property.insurance) || 0;
+    const insurance = parseFloat(normalizePrice(property.insurance)) || 0;
     const monthlyInsurance = insurance / 12;
 
-    const councilRate = parseFloat(property.councilRate) || 0;
+    const councilRate = parseFloat(normalizePrice(property.councilRate)) || 0;
     const monthlyCouncil = councilRate / 12;
 
     const rent = normalizePrice(property.rental);
     const monthlyRent = rent || 0;
     const propertyMgmtCost = monthlyRent * 0.07;
 
-    const landTax = parseFloat(property.landTax) || 0;
+    const landTax = parseFloat(normalizePrice(property.landTax)) || 0;
     const monthlyLandTax = landTax / 12;
     holdingCostBreakdown={}
 
@@ -189,7 +189,7 @@ const calculateMatchScore = (property, clientBrief) => {
     maxScore += 10 * holdWeight;
 
 
-    if (price && interestRate && lvr) {
+    if (price && interestRate && lvr && monthlyInsurance && monthlyCouncil) {
         if (clientBrief.maxMonthlyHoldingCost) {
             if (netMonthlyHoldingCost <= clientBrief.maxMonthlyHoldingCost) {
                 addScore(`💵 Holding cost matched (est. $${netMonthlyHoldingCost.toFixed(2)} / mo)`, 10 * holdWeight, '💵 Holding Cost Match');
@@ -203,7 +203,7 @@ const calculateMatchScore = (property, clientBrief) => {
             }
         }
     } else {
-        warnings.push('⚠ Holding cost could not be calculated due to missing inputs (price, LVR, or interest rate). This criterion is excluded from the match score.');
+        warnings.push('⚠ Holding cost could not be calculated due to missing inputs (price, LVR, interest rate, council rate or insurance). This criterion is excluded from the match score.');
     }
 
 

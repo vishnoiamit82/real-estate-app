@@ -5,14 +5,12 @@ function sanitizeProperty(propertyObj, context = 'external') {
         'agentId',
         'createdBy',
         '__v',
-        'is_deleted',
         'deleted_at',
         'followUpTasks',
         'conversation',
         'currentStatus',
         'decisionStatus',
         'publicListing',
-        'shareToken',
         'notes',
         'createdAt',
         'updatedAt',
@@ -24,7 +22,7 @@ function sanitizeProperty(propertyObj, context = 'external') {
         }
     }
 
-    console.log(">>> clone after strip:", clone);
+    // console.log(">>> clone after strip:", clone);
     return clone;
 }
 

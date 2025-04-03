@@ -4,6 +4,7 @@ const ClientBrief = require('../models/ClientBriefs');
 const Property = require('../models/Property');
 const { calculateMatchScore } = require('../utils/calculateMatchScore');
 
+
 // const matches = properties.map(property => {
 //   const result = calculateMatchScore(property, clientBrief);
 //   return { property, ...result };
@@ -109,61 +110,64 @@ router.put('/:id', async (req, res) => {
 
 // Get matched properties for a client brief
 router.get('/:id/matches', async (req, res) => {
-    try {
-      const clientBrief = await ClientBrief.findById(req.params.id);
-      if (!clientBrief) return res.status(404).json({ message: 'Client brief not found.' });
-  
-      // Only fetch properties created by user OR shared with community
-      const properties = await Property.find({
-        $or: [
-          { createdBy: req.user.id },
-          { isCommunityShared: true }
-        ]
-      });
-  
-      const matches = properties.map(property => {
-        const {
-          score,
-          scoreDetails,
-          maxScore,
-          rawScore,
-          penalties,
-          matchTier,
-          matchedTags,
-          unmatchedCriteria,
-          estimatedHoldingCost,
-          netMonthlyHoldingCost,
-          holdingCostBreakdown,
-          warnings,
-          calculationInputs
-          
-        } = calculateMatchScore(property, clientBrief);
-      
-        return {
-          property,
-          score,
-          scoreDetails,
-          rawScore,
-          maxScore,
-          penalties,
-          matchTier,
-          matchedTags,
-          unmatchedCriteria,
-          estimatedHoldingCost,
-          netMonthlyHoldingCost,
-          holdingCostBreakdown,
-          warnings,
-          calculationInputs
-        };
-      });
-      
-  
-      res.status(200).json(matches);
-    } catch (error) {
-      console.error('Error fetching matches:', error);
-      res.status(500).json({ message: 'Error fetching matches.' });
-    }
-  });
+  try {
+    const clientBrief = await ClientBrief.findById(req.params.id);
+    if (!clientBrief) return res.status(404).json({ message: 'Client brief not found.' });
+
+    // Only fetch properties created by user or shared with community, and not deleted
+    const properties = await Property.find({
+      is_deleted: { $ne: true },
+      $or: [
+        { createdBy: req.user.id },
+        { isCommunityShared: true }
+      ]
+    });
+
+    const matches = properties.map(property => {
+      const {
+        score,
+        scoreDetails,
+        maxScore,
+        rawScore,
+        penalties,
+        matchTier,
+        matchedTags,
+        unmatchedCriteria,
+        estimatedHoldingCost,
+        netMonthlyHoldingCost,
+        holdingCostBreakdown,
+        warnings,
+        calculationInputs
+      } = calculateMatchScore(property, clientBrief);
+
+      return {
+        property,
+        score,
+        scoreDetails,
+        rawScore,
+        maxScore,
+        penalties,
+        matchTier,
+        matchedTags,
+        unmatchedCriteria,
+        estimatedHoldingCost,
+        netMonthlyHoldingCost,
+        holdingCostBreakdown,
+        warnings,
+        calculationInputs
+      };
+    });
+
+    // Count properties with score >= 80
+    const matchCount = matches.filter(m => m.score >= 80).length;
+
+    res.status(200).json({ matchCount, matches });
+  } catch (error) {
+    console.error('Error fetching matches:', error);
+    res.status(500).json({ message: 'Error fetching matches.' });
+  }
+});
+
 
 
 

@@ -4,8 +4,34 @@ const Property = require('../models/Property');
 const { authMiddleware,authorize } = require('../middlewares/authMiddleware'); // Ensure you have this middleware
 const crypto = require('crypto');
 const ClientBrief = require('../models/ClientBriefs');
+const propertyMatchesClientBrief = require('../utils/propertyMatchesClientBrief');
+const ExtractNumericRange = require('../utils/ExtractNumericRange');
+
 
 const twilio = require('twilio');
+
+
+const parsePriceRange = (text) => {
+    const numbers = text.match(/\d[\d,]*/g);
+    if (!numbers) return { min: null, max: null };
+  
+    const [minStr, maxStr] = numbers.map(n => Number(n.replace(/,/g, '')));
+    return {
+      min: minStr || null,
+      max: maxStr || minStr || null,
+    };
+  };
+  
+  const parseRent = (text) => {
+    const match = text.match(/\d[\d,]*/);
+    return match ? Number(match[0].replace(/,/g, '')) : null;
+  };
+  
+  const parseYield = (text) => {
+    const match = text.match(/(\d+(\.\d+)?)%/);
+    return match ? parseFloat(match[1]) : null;
+  };
+  
 
 // Helper function to sanitize date values
 const parseDateOrNull = (dateString) => {
@@ -160,6 +186,49 @@ router.get('/:id/due-diligence/validate', authorize(['view_property']), async (r
 
 router.post('/', authMiddleware, authorize(['view_property']), async (req, res) => {
     try {
+        // 🔢 Parse numeric values from price, rent, and yield fields
+
+        const parsePriceRange = (text) => {
+            const cleaned = text.toLowerCase();
+            const numbers = text.match(/\d[\d,]*/g);
+        
+            if (!numbers) return { min: null, max: null };
+        
+            const [num1, num2] = numbers.map(n => Number(n.replace(/,/g, '')));
+        
+            if (cleaned.includes("over")) {
+                return { min: num1, max: null };
+            } else if (cleaned.includes("under") || cleaned.includes("up to")) {
+                return { min: null, max: num1 };
+            } else if (cleaned.includes("from")) {
+                return { min: num1, max: num2 || null };
+            } else if (numbers.length === 2) {
+                return { min: num1, max: num2 };
+            } else {
+                return { min: num1, max: num1 }; // fallback: single price
+            }
+        };
+        
+
+        const parseRent = (text) => {
+            const match = text.match(/\d[\d,]*/);
+            return match ? Number(match[0].replace(/,/g, '')) : null;
+        };
+
+        const parseYield = (text) => {
+            const match = text.match(/(\d+(\.\d+)?)%/);
+            return match ? parseFloat(match[1]) : null;
+        };
+        
+
+        // Extract and calculate numeric values from free-text fields
+        const { askingPrice, rental, rentalYield } = req.body;
+        const { min, max } = parsePriceRange(askingPrice || '');
+        const rentPerWeek = parseRent(rental || '');
+        const rentalYieldPercent = parseYield(rentalYield || '');
+        const landSizeNumeric = ExtractNumericRange(landSize)
+        const yearBuiltNumeric = ExtractNumericRange(yearBuilt)
+
         // Sanitize incoming data and attach the logged-in user's id as createdBy
         const sanitizedData = {
             ...req.body,
@@ -175,6 +244,12 @@ router.post('/', authMiddleware, authorize(['view_property']), async (req, res) 
                       completed: task.completed || false,
                   }))
                 : [],
+            askingPriceMin: min,
+            askingPriceMax: max,
+            rentPerWeek,
+            rentalYieldPercent,
+            landSizeNumeric,
+            yearBuiltNumeric
         };
 
         // Create new property
@@ -212,8 +287,7 @@ router.post('/', authMiddleware, authorize(['view_property']), async (req, res) 
     }
 });
 
-
-router.get('/community', authMiddleware, async (req, res) => {
+router.get('/community', async (req, res) => {
     try {
       const properties = await Property.find({
         isCommunityShared: true,
@@ -236,56 +310,61 @@ router.get('/community', authMiddleware, async (req, res) => {
     }
   });
   
-
-
-router.get('/', authMiddleware, authorize(['view_property']),async (req, res) => {
+  router.get('/', authMiddleware, authorize(['view_property']), async (req, res) => {
     try {
-        const currentUserId = req.user._id;
-        console.log("currentUserId-->", currentUserId);
-
-        let properties;
-        if (req.user.role === 'admin') {
-            // Admin: Return all properties without privacy filters
-            properties = await Property.find().populate('agentId', 'name email phoneNumber');
-        } else {
-            // Non-admin: Filter properties based on privacy rules:
-            // 1. publicListing is true, OR
-            // 2. createdBy equals the current user, OR
-            // 3. sharedWith includes the current user.
-            properties = await Property.find({
-                $or: [
-                    { publicListing: true },
-                    { createdBy: currentUserId },
-                    { sharedWith: currentUserId }
-                ]
-            }).populate('agentId', 'name email phoneNumber');
-        }
-
-        console.log("Fetched properties:", properties);
-
-        let sanitizedProperties;
-        if (req.user.role === 'admin') {
-            // Admins see all details as-is
-            sanitizedProperties = properties;
-        } else {
-            // Non-admin users: hide address if showAddress is false and user is not owner/shared
-            sanitizedProperties = properties.map(property => {
-                const propObj = property.toObject();
-                const isOwner = String(propObj.createdBy) === String(currentUserId);
-                const isShared = propObj.sharedWith && propObj.sharedWith.some(id => String(id) === String(currentUserId));
-                if (!propObj.showAddress && !isOwner && !isShared) {
-                    propObj.address = "Address Hidden";
-                }
-                return propObj;
-            });
-        }
-
-        res.status(200).json(sanitizedProperties);
+      const currentUserId = req.user._id;
+      const { mine, status, is_deleted } = req.query;
+  
+      let query = {};
+  
+      // ✅ Apply is_deleted filter (defaults to false)
+      if (is_deleted === 'true') {
+        query.is_deleted = true;
+      } else if (is_deleted === 'false' || !is_deleted) {
+        query.is_deleted = false;
+      }
+  
+      // 🔐 Filter only own properties if mine=true
+      if (mine === 'true') {
+        query.createdBy = currentUserId;
+      } else if (req.user.role !== 'admin') {
+        query.$or = [
+          { publicListing: true },
+          { createdBy: currentUserId },
+          { sharedWith: currentUserId },
+        ];
+      }
+  
+      // 🟡 Apply decisionStatus filter if provided
+      if (status) {
+        const statusArray = status.split(',').map(s => s.trim());
+        query.decisionStatus = { $in: statusArray };
+      }
+  
+      console.log('Final Query:', query);
+  
+      const properties = await Property.find(query).populate('agentId', 'name email phoneNumber');
+  
+      const sanitized = req.user.role === 'admin'
+        ? properties
+        : properties.map((property) => {
+            const prop = property.toObject();
+            const isOwner = String(prop.createdBy) === String(currentUserId);
+            const isShared = prop.sharedWith?.some(id => String(id) === String(currentUserId));
+            if (!prop.showAddress && !isOwner && !isShared) {
+              prop.address = 'Address Hidden';
+            }
+            return prop;
+          });
+  
+      res.json(sanitized);
     } catch (error) {
-        console.error('Error fetching properties:', error);
-        res.status(500).json({ message: 'Error fetching properties.' });
+      console.error('Error fetching properties:', error);
+      res.status(500).json({ message: 'Error fetching properties.' });
     }
-});
+  });
+  
+  
 
 // ✅ PATCH: Update Property Status
 router.patch('/:id/status', authMiddleware, authorize(['edit_property']), async (req, res) => {
@@ -426,7 +505,7 @@ router.get('/:id',  authMiddleware,authorize(['view_property']), async (req, res
         if (!property) {
             return res.status(404).json({ message: 'Property not found.' });
         }
-        res.status(200).json(property);
+        res.status(200).json(property.toObject());
     } catch (error) {
         console.error('Error fetching property:', error);
         res.status(500).json({ message: 'Error fetching property.' });

@@ -12,50 +12,70 @@ router.post('/', async (req, res) => {
     }
 
     try {
-        // OpenAI API prompt
         const prompt = `
-        Extract structured property details from the following text: 
-        "${description}". 
-        Return a valid JSON object with these fields:
+            Extract structured property details from the following text: 
+            "${description}". 
+            Return a valid JSON object with these fields:
 
-        - address (string)
-        - askingPrice (string)
-        - rental (string)
-        - rentalYield (string, if missing, calculate from rental & price)
-        - bedrooms (number)
-        - bathrooms (number)
-        - carSpaces (number)
-        - isOffMarket (boolean, if offmarket mentioned then mark the boolean as true otherwise false)
-        - landSize (string, include unit e.g., sqm or acres)
-        - propertyType (string, e.g., house, apartment, townhouse)
-        - yearBuilt (string)
-        - features (array of strings, e.g., ["pool", "air conditioning", "solar panels"])
-        - councilRate (string)
-        - insurance (string)
-        - floodZone (string)
-        - bushfireZone (string)
-        - zoningType (string, e.g., residential, commercial)
-        - nearbySchools (array of strings, e.g., ["School A", "School B"])
-        - publicTransport (array of strings, e.g., ["Train Station 1", "Bus Stop 3"])
-        - agentName (string)
-        - propertyLink (string, ensure it starts with 'https')
-        - videoAvailableDate (string, if an agent mentions "video next week", extract the date)
-        - upcomingInspectionDate (string, if an inspection is scheduled, extract the date)
-        - additionalDocsExpected (string, if "documents available next week", extract date)
-        - propertyCondition (string, e.g., "good", "needs renovation", "brand new")
-        - Renovations (string, if any existing renovation or potential information present, extract the information)
-        - Future prospects (string, if any information about subdivision, plans and permits available, extract the information)
-        - followUpTasks (array of objects, only if agent clearly states a future action)
-            Each object should have:
-            - task (string, e.g., "Follow up for video")
-            - followUpDate (string, must be an actual date, not "next week")
-            - reason (string, must be based on explicit wording, not assumptions)
+            - address (string)
+            - askingPrice (string): 
+                • If a price **range** is mentioned, format as "$xxx,xxx - $yyy,yyy".  
+                • If it says "over $xxx,xxx", return "Over $xxx,xxx".  
+                • If it's a **fixed price**, return that (e.g., "$520,000").
+            - rental (string): Remove any text, return in format "$xxx/w" or "$xxx – $yyy/w" if a range.
+            - rentalYield (string): If not directly stated, calculate using rental and asking price.
+                • For yield range, use lower rent ÷ higher price for lower bound, and higher rent ÷ lower price for upper bound. Format: "x.x% – y.y%"
+                • For fixed, format as "x.x%"
 
-        🚨 **IMPORTANT:**  
-        - If no future action is clearly mentioned, **return an empty "followUpTasks": []**  
-        - Do **NOT** create follow-up tasks unless the agent explicitly states a specific date or action (e.g., "We will send the documents next Friday").  
-        - Ignore vague statements like "more details soon" or "let me know if you need anything."  
-        `;
+            - bedrooms (number)
+            - bathrooms (number)
+            - carSpaces (number)
+            - isOffMarket (boolean): If "off-market" is mentioned, return true, otherwise false.
+            - landSize (string): Include unit (e.g., sqm, acres)
+            - propertyType (string): e.g., house, apartment, townhouse
+            - yearBuilt (string)
+            - features (array of strings): e.g., ["pool", "air conditioning", "solar panels"]
+            - councilRate (string): Extract if mentioned, or estimate if suburb is known.
+            - zoningType (string): e.g., residential, commercial
+
+            - dueDiligence (object):
+                - insurance (string)
+                - floodZone (string)
+                - bushfireZone (string)
+                - socialHousing (string)
+
+            - nearbySchools (array of strings): e.g., ["School A", "School B"]
+            - publicTransport (array of strings): e.g., ["Train Station 1", "Bus Stop 3"]
+
+            - agentName (string)
+
+            - propertyLink (string): If a link is mentioned, extract it.
+
+            - mapsLink (string): Generate a Google Maps link from the address in this format:  
+            "https://www.google.com/maps/search/?api=1&query=ADDRESS"
+
+            - tags: Return tags only from this list if mentioned:  
+            ["Recently Renovated", "Needs Renovation", "Subdivision Potential", "Plans & Permits", "Granny Flat", "Dual Living", "Zoned for Development"]
+
+            - videoAvailableDate (string): Extract concrete date if video is mentioned. If vague or missing, return null.
+            - upcomingInspectionDate (string): Extract if inspection is scheduled. Return a future date or null.
+            - additionalDocsExpected (string): Extract date if documents are expected.
+            - propertyCondition (string): e.g., "good", "needs renovation", "brand new"
+            - Renovations (string): Any notes about current or suggested renovations.
+            - Future prospects (string): e.g., "subdivision potential", "plans and permits in place"
+
+            - followUpTasks (array of objects): Only if agent clearly states a specific follow-up.
+                Each object must include:
+                - task (string)
+                - followUpDate (string): Must be an exact date
+                - reason (string): Based on explicit text
+
+            🚨 **IMPORTANT:**  
+            - If no future follow-up is clearly mentioned, return an empty "followUpTasks": []  
+            - Do **NOT** include vague tasks like "will keep you posted" or "let me know if interested."
+            `;
+
+
 
         // Call OpenAI API
         const response = await axios.post(
@@ -150,5 +170,7 @@ router.post('/', async (req, res) => {
         return res.status(500).json({ message: 'Error processing description.' });
     }
 });
+
+
 
 module.exports = router;

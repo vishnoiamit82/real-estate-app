@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 
 const PropertyConversationSchema = new mongoose.Schema({
   propertyId: { type: mongoose.Schema.Types.ObjectId, ref: 'Property', required: true },
-  clientBriefId: { type: mongoose.Schema.Types.ObjectId, ref: 'ClientBrief' }, // optional
+  clientBriefId: { type: mongoose.Schema.Types.ObjectId, ref: 'ClientBrief' },
   type: {
     type: String,
     enum: ['sent', 'reply', 'message-poster', 'system-note'],
@@ -19,9 +19,13 @@ const PropertyConversationSchema = new mongoose.Schema({
     name: String,
     email: String
   },
-  attachments: [{ type: String }], // file URLs or filenames
+  attachments: [{ type: String }],
   timestamp: { type: Date, default: Date.now },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+  // ✅ New field to track unread replies
+  isRead: { type: Boolean, default: false }
 });
+
 
 module.exports = mongoose.model('PropertyConversation', PropertyConversationSchema);

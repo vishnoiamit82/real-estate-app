@@ -9,6 +9,12 @@ const PropertySchema = new mongoose.Schema({
     askingPrice: { type: String, trim: true },
     rental: { type: String, trim: true },
     rentalYield: { type: String, trim: true },
+    // Add these just below `rentalYield`
+    askingPriceMin: { type: Number },
+    askingPriceMax: { type: Number },
+    rentPerWeek: { type: Number },
+    rentalYieldPercent: { type: Number },
+
     
 
     // Additional Property Details
@@ -27,12 +33,17 @@ const PropertySchema = new mongoose.Schema({
     nearbySchools: [{ type: String }], // Array of nearby schools
     publicTransport: [{ type: String }], // Array of transport links
     marketTrends: { type: String, trim: true },
+    tags: [{ type: String }],
+    mapsLink: { type: String, trim: true },
+
+    landSizeNumeric: { type: Number, trim: true },
+    yearBuiltNumeric: { type: Number, trim: true },
 
     // Important Dates
-    offerClosingDate: { type: Date },
-    videoAvailableDate: { type: Date, default: null },
-    upcomingInspectionDate: { type: Date, default: null },
-    additionalDocsExpected: { type: Date, default: null },
+    offerClosingDate: { type: String },
+    videoAvailableDate: { type: String, default: null },
+    upcomingInspectionDate: { type: String, default: null },
+    additionalDocsExpected: { type: String, default: null },
 
     // Condition & Renovation Info
     propertyCondition: { type: String, trim: true },
@@ -94,10 +105,10 @@ const PropertySchema = new mongoose.Schema({
 
       // **New: Due Diligence Object**
     dueDiligence: {
-        insurance: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
-        floodZone: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
-        bushfireZone: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
-        socialHousing: { type: String, enum: ["pending", "completed", "failed"], default: "pending" },
+        insurance: { type: String,  default: null },
+        floodZone: { type: String,  default: null },
+        bushfireZone: { type: String,  default: null },
+        socialHousing: { type: String,  default: null },
         // Allow dynamic fields for additional checks
         additionalChecks: [{ 
             name: { type: String, required: true },

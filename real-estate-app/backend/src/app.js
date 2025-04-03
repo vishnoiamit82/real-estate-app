@@ -35,6 +35,10 @@ const savedPropertyRoutes = require('./routes/savedPropertyRoutes');
 const sharedPropertyRoute = require('./routes/sharedPropertyRoute');
 const propertyConversationRoute = require('./routes/propertyConversationRoutes');
 const authRoutes = require('./routes/auth'); // contains /refresh endpoint
+const publicRoutes = require('./routes/publicRoutes');
+const adminQueriesRoutes = require('./routes/adminQueriesRoutes');
+
+
 
 
 // Load environment-specific `.env` file
@@ -95,8 +99,21 @@ app.use('/api/shared', sharedPropertyRoute);
 
 // ✅ Protected routes (Require authentication)
 app.use('/api/agents', authMiddleware, agentRoutes);
-app.use('/api/properties', authMiddleware, propertyRoutes);
+
+app.use('/api/properties', (req, res, next) => {
+    const publicPaths = ['/community']; // relative to /api/properties
+    if (publicPaths.includes(req.path)) {
+      return next();
+    }
+    return authMiddleware(req, res, next);
+  }, propertyRoutes);
+
+// Public AI search
+app.use('/api/public', publicRoutes);
+
+// Protected processing
 app.use('/api/process-description', authMiddleware, processDescriptionRoutes);
+
 app.use('/api/client-briefs', authMiddleware, clientBriefRoutes);
 app.use('/api/buyers-agents', authMiddleware, buyersAgentRoutes);
 app.use('/api/follow-up-tasks', authMiddleware, taskRoutes);
@@ -114,6 +131,8 @@ app.use('/api/email-replies', emailRepliesRoutes);
 app.use('/api/saved-properties', authMiddleware, savedPropertyRoutes);
 
 app.use('/api/property-conversations', authMiddleware, propertyConversationRoute);
+app.use('/api/ai-search-queries', authMiddleware, adminQueriesRoutes);
+
 
 
 
