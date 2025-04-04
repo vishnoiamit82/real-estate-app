@@ -1,6 +1,7 @@
 // utils/extractNumericRange.js
 
 function extractNumericRange(text, isPercentage = false) {
+
     if (!text || typeof text !== 'string') return null;
   
     const sanitized = text
@@ -22,4 +23,5 @@ function extractNumericRange(text, isPercentage = false) {
   }
   
   module.exports = extractNumericRange;
+  
   

@@ -115,6 +115,18 @@ const PropertySchema = new mongoose.Schema({
             status: { type: String, enum: ["pending", "completed", "failed"], default: "pending" }
         }]
     },
+    documents: {
+        type: [String],
+        default: []
+      },
+      videos: {
+        type: [String],
+        default: []
+      }
+      
+      
+      
+    
     
 
     // // Array of users with whom this property is shared
