@@ -5,35 +5,51 @@ const Property = require('../models/Property');
 const AISearchQuery = require('../models/AISearchQuery');
 
 
+
+
 // Helper: Build GPT prompt from user query
 const buildSearchPrompt = (query) => `
-You are a real estate assistant. A user is searching for a property using this query:  
+You are a real estate assistant. A user is searching for a property using this natural language query:
+
 "${query}"
 
-Your job is to extract structured **search filters** from the query and return a valid JSON object.
+Your job is to convert this into structured **MongoDB-compatible filters** as a JSON object.
 
-Return only the fields clearly mentioned in the query:
+Return only the following fields if they are explicitly stated:
 
-- bedrooms (number or null)
-- bathrooms (number or null)
-- carSpaces (number or null)
-- propertyType (string or null)
-- minPrice (number or null)
-if the price says around $xx then reduce min price by 20,000
-- maxPrice (number or null)
-if the price says around $xx then increase max price by 20,000
-- minRent (number or null)
-- maxRent (number or null)
-- rentalYieldMin (number or null)
-- rentalYieldMax (number or null)
-- landSizeMin (number or null)
-- yearBuiltMin (number or null)
-- mustHaveTags (array of strings): Choose from:
+### 🔢 Numbers
+- minPrice (number)
+- maxPrice (number)
+- minRent (number)
+- maxRent (number)
+- rentalYieldMin (number)
+- rentalYieldMax (number)
+- bedrooms (number)
+- bathrooms (number)
+- carSpaces (number)
+- landSizeMin (number, in sqm)
+- yearBuiltMin (number)
+
+### 🏷️ Text / Lists
+- propertyType (string)
+mustHaveTags (array): Choose only from this list. Only return a tag if the query contains **an exact or close synonym** (not vague associations).  
+  Do NOT return tags based on inferred investment context (e.g., SMSF, yield, capital growth).  
+  Only include a tag if words like “renovation”, “needs work”, “granny flat”, etc., are clearly mentioned.
   ["Recently Renovated", "Needs Renovation", "Subdivision Potential", "Plans & Permits", "Granny Flat", "Dual Living", "Zoned for Development"]
-- locations (array of strings)
+  Example: Query "SMSF properties" → do NOT return any tags, unless the user also says "renovation" or similar.
+- locations (array of suburb or region names)
 
-🚨 Do NOT infer vague details. Return only clean JSON with explicitly stated filters.
+### 🧠 Notes:
+- If price is "around $XXX", set minPrice = XXX - 20000 and maxPrice = XXX + 20000
+- If the user **explicitly** mentions "reno", "renovation", "flipping", "fixer upper", "needs work", then return "Needs Renovation". Do NOT infer based on investment language like SMSF, strategy, or potential.
+- If user mentions "no flooding", "not flood prone", set floodZone = "none"
+- Convert acres or hectares to sqm if needed for land size
+
+Do NOT guess missing data.
+Return clean, valid JSON only with no explanations.
 `;
+
+
 
 // Helper: Build MongoDB query from filters
 const buildMongoQuery = (req, filters) => {
@@ -55,9 +71,9 @@ const buildMongoQuery = (req, filters) => {
       
   const isValidNumber = (value) => typeof value === 'number' && !isNaN(value);
 
-  if (isValidNumber(filters.bedrooms)) mongoQuery.bedrooms = { $gte: filters.bedrooms };
-  if (isValidNumber(filters.bathrooms)) mongoQuery.bathrooms = { $gte: filters.bathrooms };
-  if (isValidNumber(filters.carSpaces)) mongoQuery.carSpaces = { $gte: filters.carSpaces };
+  if (isValidNumber(filters.bedrooms)) query.bedrooms = { $gte: filters.bedrooms };
+  if (isValidNumber(filters.bathrooms)) query.bathrooms = { $gte: filters.bathrooms };
+  if (isValidNumber(filters.carSpaces)) query.carSpaces = { $gte: filters.carSpaces };
   
   if (filters.propertyType) query.propertyType = filters.propertyType;
 
@@ -77,6 +93,7 @@ const buildMongoQuery = (req, filters) => {
   }
 
   if (filters.landSizeMin) query.landSizeSqm = { $gte: filters.landSizeMin };
+
   if (filters.yearBuiltMin) query.yearBuiltNumeric = { $gte: filters.yearBuiltMin };
 
   if (filters.mustHaveTags?.length) {
@@ -87,13 +104,70 @@ const buildMongoQuery = (req, filters) => {
     query.address = { $regex: filters.locations.join('|'), $options: 'i' };
   }
 
+  if (filters.isOffmarket !== undefined) {
+    query.isOffmarket = filters.isOffmarket;
+  }
+  
+  if (filters.subdivisionPotential !== undefined) {
+    query.subdivisionPotential = filters.subdivisionPotential;
+  }
+  
+  if (filters.zoningType) {
+    query.zoningType = { $regex: filters.zoningType, $options: 'i' };
+  }
+  
+  if (filters.floodZone) {
+    query.floodZone = { $regex: filters.floodZone, $options: 'i' };
+  }
+  
+  if (filters.bushfireZone) {
+    query.bushfireZone = { $regex: filters.bushfireZone, $options: 'i' };
+  }
+  
+  if (filters.propertyCondition) {
+    query.propertyCondition = { $regex: filters.propertyCondition, $options: 'i' };
+  }
+  
+  if (filters.features?.length) {
+    query.features = { $in: filters.features };
+  }
+  
+  if (filters.tags?.length) {
+    query.tags = { $in: filters.tags };
+  }
+  
+  if (filters.publicListing !== undefined) {
+    query.publicListing = filters.publicListing;
+  }
+  
+  if (filters.videosRequired) {
+    query.videos = { $exists: true, $not: { $size: 0 } };
+  }
+  
+  if (filters.documentsRequired) {
+    query.documents = { $exists: true, $not: { $size: 0 } };
+  }
+  
+  // Due diligence nested object
+  if (filters.dueDiligence?.floodZone) {
+    query["dueDiligence.floodZone"] = { $regex: filters.dueDiligence.floodZone, $options: 'i' };
+  }
+  if (filters.dueDiligence?.bushfireZone) {
+    query["dueDiligence.bushfireZone"] = { $regex: filters.dueDiligence.bushfireZone, $options: 'i' };
+  }
+  if (filters.dueDiligence?.socialHousing) {
+    query["dueDiligence.socialHousing"] = { $regex: filters.dueDiligence.socialHousing, $options: 'i' };
+  }
+
   console.log ("Mongo DB query", query)
 
   return query;
 };
 
+  
+
 // Main route
-router.post('/ai-search', async (req, res) => {
+router.post('/ai-search-preview', async (req, res) => {
   const { query } = req.body;
   if (!query) return res.status(400).json({ message: 'Search query is required.' });
 
@@ -119,6 +193,8 @@ router.post('/ai-search', async (req, res) => {
       }
     );
 
+    console.log ("chatgpt response", gptRes.data.choices)
+
     let parsedFilters = gptRes.data.choices[0].message.content.replace(/```json|```/g, '');
     parsedFilters = JSON.parse(parsedFilters);
 
@@ -130,11 +206,11 @@ router.post('/ai-search', async (req, res) => {
     });
 
     // 3. Build and run MongoDB query
-    const mongoQuery = buildMongoQuery(req, parsedFilters);
-    const results = await Property.find(mongoQuery).limit(30).lean();
+    // const mongoQuery = buildMongoQuery(req, parsedFilters);
+    // const results = await Property.find(mongoQuery).limit(30).lean();
 
     // 4. Respond
-    res.status(200).json({ results });
+    res.status(200).json({ parsedFilters });
 
   } catch (err) {
     console.error('AI search error:', err.response?.data || err.message);
@@ -142,4 +218,23 @@ router.post('/ai-search', async (req, res) => {
   }
 });
 
-module.exports = router;
+router.post('/property/search', async (req, res) => {
+    const filters = req.body;
+
+    console.log (filters)
+  
+    try {
+      const mongoQuery = buildMongoQuery(req, filters); // Use your existing utility
+      console.log ("mongoQuery", mongoQuery)
+      const results = await Property.find(mongoQuery).limit(30).lean();
+      res.status(200).json({ results });
+    } catch (err) {
+      console.error('Property search error:', err);
+      res.status(500).json({ message: 'Error processing property search.' });
+    }
+  });
+  
+
+
+  
+  module.exports = router;

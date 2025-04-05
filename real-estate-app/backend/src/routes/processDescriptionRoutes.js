@@ -73,6 +73,7 @@ router.post('/', async (req, res) => {
             🚨 **IMPORTANT:**  
             - If no future follow-up is clearly mentioned, return an empty "followUpTasks": []  
             - Do **NOT** include vague tasks like "will keep you posted" or "let me know if interested."
+            - If any of the field data is not retreived just return null for the fields strictly. Do not reply with Not available, or Affordable etc.
             `;
 
 
