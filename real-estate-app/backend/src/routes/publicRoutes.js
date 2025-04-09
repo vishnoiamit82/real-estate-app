@@ -3,6 +3,7 @@ const router = express.Router();
 const axios = require('axios');
 const Property = require('../models/Property');
 const AISearchQuery = require('../models/AISearchQuery');
+const Tag = require('../models/Tags');
 
 
 
@@ -29,10 +30,13 @@ Return only the following fields if they are explicitly stated:
 - carSpaces (number)
 - landSizeMin (number, in sqm)
 - yearBuiltMin (number)
+- subdivisionPotential ( boolean, true or false)
+
 
 ### 🏷️ Text / Lists
-- propertyType (string)
-mustHaveTags (array): Choose only from this list. Only return a tag if the query contains **an exact or close synonym** (not vague associations).  
+- propertyType (string): Return propertyType only from this list mentioned: [ house, apartment, townhouse, duplex ]
+
+- mustHaveTags (array): Choose only from this list. Only return a tag if the query contains **an exact or close synonym** (not vague associations).  
   Do NOT return tags based on inferred investment context (e.g., SMSF, yield, capital growth).  
   Only include a tag if words like “renovation”, “needs work”, “granny flat”, etc., are clearly mentioned.
   ["Recently Renovated", "Needs Renovation", "Subdivision Potential", "Plans & Permits", "Granny Flat", "Dual Living", "Zoned for Development"]
@@ -53,116 +57,103 @@ Return clean, valid JSON only with no explanations.
 
 // Helper: Build MongoDB query from filters
 const buildMongoQuery = (req, filters) => {
-
     const query = {
-        is_deleted: false
+      is_deleted: false
+    };
+  
+    if (!req.user?._id) {
+      query.isCommunityShared = true;
+    } else {
+      query.$or = [
+        { isCommunityShared: true },
+        { createdBy: req.user._id }
+      ];
+    }
+  
+    const isValidNumber = (value) =>
+        (typeof value === 'number' || typeof value === 'string') &&
+        !isNaN(Number(value));
+      
+    const isValidString = (val) => typeof val === 'string' && val.trim() && val.trim().toLowerCase() !== 'any';
+    const isValidArray = (arr) => Array.isArray(arr) && arr.length > 0;
+  
+    if (isValidNumber(filters.bedrooms)) query.bedrooms = { $gte: Number(filters.bedrooms) };
+    if (isValidNumber(filters.bathrooms)) query.bathrooms = { $gte: Number(filters.bathrooms) };
+    if (isValidNumber(filters.carSpaces)) query.carSpaces = { $gte: Number(filters.carSpaces) };
+  
+    if (isValidString(filters.propertyType)) query.propertyType = filters.propertyType;
+  
+    if (isValidNumber(filters.minPrice)) query.askingPriceMax = { $gte: Number(filters.minPrice) };
+    if (isValidNumber(filters.maxPrice)) query.askingPriceMin = { $lte: Number(filters.maxPrice) };
+  
+    if (isValidNumber(filters.minRent) || isValidNumber(filters.maxRent)) {
+      query.rentPerWeek = {};
+      if (isValidNumber(filters.minRent)) query.rentPerWeek.$gte = Number(filters.minRent);
+      if (isValidNumber(filters.maxRent)) query.rentPerWeek.$lte = Number(filters.maxRent);
+    }
+  
+    if (isValidNumber(filters.rentalYieldMin) || isValidNumber(filters.rentalYieldMax)) {
+      query.rentalYieldPercent = {};
+      if (isValidNumber(filters.rentalYieldMin)) query.rentalYieldPercent.$gte = Number(filters.rentalYieldMin);
+      if (isValidNumber(filters.rentalYieldMax)) query.rentalYieldPercent.$lte = Number(ilters.rentalYieldMax);
+    }
+  
+    if (isValidNumber(filters.landSizeMin)) query.landSizeSqm = { $gte: Number(filters.landSizeMin) };
+  
+    if (isValidNumber(filters.yearBuiltMin)) query.yearBuiltNumeric = { $gte: Number(filters.yearBuiltMin) };
+  
+    // if (isValidArray(filters.locations)) {
+    //   query.address = { $regex: filters.locations.join('|'), $options: 'i' };
+    // }
+  
+    if (filters.isOffmarket !== undefined) query.isOffmarket = filters.isOffmarket;
+    if (filters.subdivisionPotential !== undefined) query.subdivisionPotential = filters.subdivisionPotential;
+  
+    if (isValidString(filters.zoningType)) {
+      query.zoningType = { $regex: filters.zoningType, $options: 'i' };
+    }
+  
+    const regexOrIn = (field, value) => {
+        if (Array.isArray(value)) {
+          const values = value
+            .map(v => (typeof v === 'string' ? v : v?.name))
+            .filter(Boolean); // remove undefined/null
+      
+          if (values.length > 0) {
+            query[field] = { $in: values.map(v => new RegExp(v, 'i')) };
+          }
+        } else if (typeof value === 'string' && value.trim()) {
+          query[field] = { $regex: value, $options: 'i' };
+        }
       };
       
-      if (!req.user?._id) {
-        // Public access: only community-shared
-        query.isCommunityShared = true;
-      } else {
-        // Authenticated user: show public or personally created
-        query.$or = [
-          { isCommunityShared: true },
-          { createdBy: req.user._id }
-        ];
-      }
-      
-  const isValidNumber = (value) => typeof value === 'number' && !isNaN(value);
-
-  if (isValidNumber(filters.bedrooms)) query.bedrooms = { $gte: filters.bedrooms };
-  if (isValidNumber(filters.bathrooms)) query.bathrooms = { $gte: filters.bathrooms };
-  if (isValidNumber(filters.carSpaces)) query.carSpaces = { $gte: filters.carSpaces };
   
-  if (filters.propertyType) query.propertyType = filters.propertyType;
-
-  if (filters.minPrice) query.askingPriceMax = { $gte: filters.minPrice };
-  if (filters.maxPrice) query.askingPriceMin = { $lte: filters.maxPrice };
-
-  if (filters.minRent || filters.maxRent) {
-    query.rentPerWeek = {};
-    if (filters.minRent) query.rentPerWeek.$gte = filters.minRent;
-    if (filters.maxRent) query.rentPerWeek.$lte = filters.maxRent;
-  }
-
-  if (filters.rentalYieldMin || filters.rentalYieldMax) {
-    query.rentalYieldPercent = {};
-    if (filters.rentalYieldMin) query.rentalYieldPercent.$gte = filters.rentalYieldMin;
-    if (filters.rentalYieldMax) query.rentalYieldPercent.$lte = filters.rentalYieldMax;
-  }
-
-  if (filters.landSizeMin) query.landSizeSqm = { $gte: filters.landSizeMin };
-
-  if (filters.yearBuiltMin) query.yearBuiltNumeric = { $gte: filters.yearBuiltMin };
-
-  if (filters.mustHaveTags?.length) {
-    query.tags = { $in: filters.mustHaveTags.map(tag => new RegExp(tag, 'i')) };
-  }
-
-  if (filters.locations?.length) {
-    query.address = { $regex: filters.locations.join('|'), $options: 'i' };
-  }
-
-  if (filters.isOffmarket !== undefined) {
-    query.isOffmarket = filters.isOffmarket;
-  }
+    regexOrIn("floodZone", filters.floodZone);
+    regexOrIn("bushfireZone", filters.bushfireZone);
+    regexOrIn("propertyCondition", filters.propertyCondition);
+    regexOrIn("features", filters.features);
+    regexOrIn("tags.name", filters.tags);
   
-  if (filters.subdivisionPotential !== undefined) {
-    query.subdivisionPotential = filters.subdivisionPotential;
-  }
+    if (filters.publicListing !== undefined) query.publicListing = filters.publicListing;
   
-  if (filters.zoningType) {
-    query.zoningType = { $regex: filters.zoningType, $options: 'i' };
-  }
+    if (filters.videosRequired) {
+      query.videos = { $exists: true, $not: { $size: 0 } };
+    }
   
-  if (filters.floodZone) {
-    query.floodZone = { $regex: filters.floodZone, $options: 'i' };
-  }
+    if (filters.documentsRequired) {
+      query.documents = { $exists: true, $not: { $size: 0 } };
+    }
   
-  if (filters.bushfireZone) {
-    query.bushfireZone = { $regex: filters.bushfireZone, $options: 'i' };
-  }
+    if (filters.dueDiligence) {
+      regexOrIn("dueDiligence.floodZone", filters.dueDiligence.floodZone);
+      regexOrIn("dueDiligence.bushfireZone", filters.dueDiligence.bushfireZone);
+      regexOrIn("dueDiligence.socialHousing", filters.dueDiligence.socialHousing);
+    }
   
-  if (filters.propertyCondition) {
-    query.propertyCondition = { $regex: filters.propertyCondition, $options: 'i' };
-  }
+    console.log("Mongo DB query", query);
+    return query;
+  };
   
-  if (filters.features?.length) {
-    query.features = { $in: filters.features };
-  }
-  
-  if (filters.tags?.length) {
-    query.tags = { $in: filters.tags };
-  }
-  
-  if (filters.publicListing !== undefined) {
-    query.publicListing = filters.publicListing;
-  }
-  
-  if (filters.videosRequired) {
-    query.videos = { $exists: true, $not: { $size: 0 } };
-  }
-  
-  if (filters.documentsRequired) {
-    query.documents = { $exists: true, $not: { $size: 0 } };
-  }
-  
-  // Due diligence nested object
-  if (filters.dueDiligence?.floodZone) {
-    query["dueDiligence.floodZone"] = { $regex: filters.dueDiligence.floodZone, $options: 'i' };
-  }
-  if (filters.dueDiligence?.bushfireZone) {
-    query["dueDiligence.bushfireZone"] = { $regex: filters.dueDiligence.bushfireZone, $options: 'i' };
-  }
-  if (filters.dueDiligence?.socialHousing) {
-    query["dueDiligence.socialHousing"] = { $regex: filters.dueDiligence.socialHousing, $options: 'i' };
-  }
-
-  console.log ("Mongo DB query", query)
-
-  return query;
-};
 
   
 
@@ -233,8 +224,22 @@ router.post('/property/search', async (req, res) => {
       res.status(500).json({ message: 'Error processing property search.' });
     }
   });
+
+
+
+router.get('/property/tags', async (req, res) => {
+  try {
+    const tags = await Tag.find({}, { _id: 0, name: 1, type: 1 }).sort({ name: 1 }); // Get only name + type
+    res.json(tags);
+  } catch (err) {
+    console.error("Error fetching tags:", err);
+    res.status(500).json({ message: "Failed to retrieve tags." });
+  }
+});
+
   
 
+  
 
   
   module.exports = router;

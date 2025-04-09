@@ -11,9 +11,7 @@ function sanitizeProperty(propertyObj, context = 'external') {
         'currentStatus',
         'decisionStatus',
         'publicListing',
-        'notes',
-        'createdAt',
-        'updatedAt',
+        'notes'
     ];
 
     if (context !== 'owner') {

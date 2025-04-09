@@ -21,6 +21,11 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
       },
+
+    isApproved: {
+        type: Boolean,
+        default: false
+    },  
       
  
     agencyName: String, // For sales and buyer's agents

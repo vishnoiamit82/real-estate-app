@@ -64,7 +64,8 @@ const seedAdminUser = async () => {
             phoneNumber: '000-000-0000',
             role: 'admin',
             subscriptionTier: 'premium',
-            permissions: adminPermissions
+            permissions: adminPermissions,
+            isApproved: true
         });
 
         await adminUser.save();

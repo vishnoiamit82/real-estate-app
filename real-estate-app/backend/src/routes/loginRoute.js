@@ -23,6 +23,10 @@ router.post('/', async (req, res) => {
             return res.status(401).json({ message: 'Invalid credentials' });
         }
 
+        if (!user.isApproved)
+        return res.status(403).json({ message: 'Your account is under review and pending approval.' });
+
+
         // Generate JWT token
         const token = jwt.sign(
             { id: user._id, role: user.role, permissions: user.permissions, name: user.name, isEmailVerified: user.isEmailVerified },

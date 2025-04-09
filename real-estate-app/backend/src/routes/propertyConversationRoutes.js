@@ -4,8 +4,51 @@ const router = express.Router();
 const PropertyConversation = require('../models/PropertyConversation');
 const { authMiddleware,authorize } = require('../middlewares/authMiddleware'); 
 
+
+
+
+router.get('/unread-counts', authMiddleware, async (req, res) => {
+  try {
+    const { ids } = req.query;
+
+    if (!ids) {
+      return res.status(400).json({ message: 'Missing property IDs.' });
+    }
+
+    const propertyIds = ids.split(',').map(id => id.trim());
+
+    const results = await PropertyConversation.aggregate([
+      {
+        $match: {
+          propertyId: { $in: propertyIds.map(id => id) },
+          type: 'reply',
+          isRead: false,
+        },
+      },
+      {
+        $group: {
+          _id: '$propertyId',
+          unreadCount: { $sum: 1 },
+        },
+      },
+    ]);
+
+    // Return { propertyId: count } format
+    const unreadMap = {};
+    for (const result of results) {
+      unreadMap[result._id] = result.unreadCount;
+    }
+
+    res.json(unreadMap);
+  } catch (err) {
+    console.error('Batch unread count error:', err);
+    res.status(500).json({ message: 'Failed to fetch unread email counts.' });
+  }
+});
+
+
 // GET all conversations for a property
-router.get('/:propertyId', authMiddleware, async (req, res) => {
+router.get('/:propertyId', async (req, res) => {
   try {
     const messages = await PropertyConversation.find({ propertyId: req.params.propertyId })
       .sort({ timestamp: -1 });
@@ -32,22 +75,27 @@ router.post('/', authMiddleware, async (req, res) => {
 });
 
 
-router.get('/:propertyId/unread-count', authMiddleware, async (req, res) => {
-  try {
-    const { propertyId } = req.params;
+// routes/propertyConversations.js
 
-    const count = await PropertyConversation.countDocuments({
-      propertyId,
-      type: 'reply',
-      isRead: false
-    });
 
-    res.json({ unreadCount: count });
-  } catch (err) {
-    console.error('Unread count error:', err);
-    res.status(500).json({ message: 'Failed to fetch unread email count.' });
-  }
-});
+
+
+// router.get('/:propertyId/unread-count', authMiddleware, async (req, res) => {
+//   try {
+//     const { propertyId } = req.params;
+
+//     const count = await PropertyConversation.countDocuments({
+//       propertyId,
+//       type: 'reply',
+//       isRead: false
+//     });
+
+//     res.json({ unreadCount: count });
+//   } catch (err) {
+//     console.error('Unread count error:', err);
+//     res.status(500).json({ message: 'Failed to fetch unread email count.' });
+//   }
+// });
 
 
 router.post('/:conversationId/mark-as-read', authMiddleware, async (req, res) => {

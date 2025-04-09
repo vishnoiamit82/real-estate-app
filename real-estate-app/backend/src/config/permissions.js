@@ -10,6 +10,7 @@ const PERMISSION_GROUPS = {
     property_management: ['view_property', 'share_property', 'update_property', 'delete_property', 'restore_property'],
     communications: ['send_sms', 'send_email', 'email_management'],
     agent_access: ['view_agents'],
+    tags: ['view_tags', 'edit_tags'],
     notes_and_conversations: ['view_conversations', 'view_notes', 'create_notes', 'get_notes'],
     user_management: ['manage_users', 'view_users'],
     subscriptions: ['manage_subscriptions'],
@@ -28,7 +29,8 @@ const ROLE_PERMISSIONS = {
         ...PERMISSION_GROUPS.contacts,
         ...PERMISSION_GROUPS.admin_dashboard,
         ...PERMISSION_GROUPS.agent_access,
-        ...PERMISSION_GROUPS.subscriptions
+        ...PERMISSION_GROUPS.subscriptions,
+        ...PERMISSION_GROUPS.tags
     ],
     buyers_agent: [
         ...PERMISSION_GROUPS.property_management,

@@ -332,80 +332,147 @@ router.post('/', authMiddleware, authorize(['view_property']), async (req, res) 
 
 router.get('/community', async (req, res) => {
     try {
-        const properties = await Property.find({
-            isCommunityShared: true,
-            is_deleted: false,
-            sharedBy: { $ne: null }
-        })
-            .populate('sharedBy', 'name email');
-
-        const sanitized = properties.map((prop) => {
-            const obj = prop.toObject();
-            delete obj.agentId; // 👈 Remove agent data
-            return obj;
-        });
-
-        res.json(sanitized);
-
+      const {
+        posted_within_days,
+        include_deleted,
+        page = 1,
+        limit = 20,
+      } = req.query;
+  
+      const query = {
+        isCommunityShared: true,
+        sharedBy: { $ne: null },
+      };
+  
+      // Filter deleted
+      if (include_deleted !== 'true') {
+        query.is_deleted = false;
+      }
+  
+      // Filter by date
+      if (posted_within_days && !isNaN(posted_within_days)) {
+        const days = parseInt(posted_within_days, 10);
+        const since = new Date();
+        since.setDate(since.getDate() - days);
+        query.createdAt = { $gte: since };
+      }
+  
+      const skip = (parseInt(page) - 1) * parseInt(limit);
+  
+      const [properties, total] = await Promise.all([
+        Property.find(query)
+          .populate('sharedBy', 'name email')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(parseInt(limit)),
+  
+        Property.countDocuments(query),
+      ]);
+  
+      const sanitized = properties.map((prop) => {
+        const obj = prop.toObject();
+        delete obj.agentId;
+        return obj;
+      });
+  
+      res.json({
+        data: sanitized,
+        total,
+        page: parseInt(page),
+        totalPages: Math.ceil(total / parseInt(limit)),
+      });
     } catch (error) {
-        console.error('Error fetching community properties:', error);
-        res.status(500).json({ message: 'Error fetching community properties.' });
+      console.error('Error fetching community properties:', error);
+      res.status(500).json({ message: 'Error fetching community properties.' });
     }
-});
-
-router.get('/', authMiddleware, authorize(['view_property']), async (req, res) => {
+  });
+  
+  
+  router.get('/', authMiddleware, authorize(['view_property']), async (req, res) => {
     try {
-        const currentUserId = req.user._id;
-        const { mine, status, is_deleted } = req.query;
-
-        let query = {};
-
-        // ✅ Apply is_deleted filter (defaults to false)
-        if (is_deleted === 'true') {
-            query.is_deleted = true;
-        } else if (is_deleted === 'false' || !is_deleted) {
-            query.is_deleted = false;
-        }
-
-        // 🔐 Filter only own properties if mine=true
-        if (mine === 'true') {
-            query.createdBy = currentUserId;
-        } else if (req.user.role !== 'admin') {
-            query.$or = [
-                { publicListing: true },
-                { createdBy: currentUserId },
-                { sharedWith: currentUserId },
-            ];
-        }
-
-        // 🟡 Apply decisionStatus filter if provided
-        if (status) {
-            const statusArray = status.split(',').map(s => s.trim());
-            query.decisionStatus = { $in: statusArray };
-        }
-
-        console.log('Final Query:', query);
-
-        const properties = await Property.find(query).populate('agentId', 'name email phoneNumber');
-
-        const sanitized = req.user.role === 'admin'
-            ? properties
-            : properties.map((property) => {
-                const prop = property.toObject();
-                const isOwner = String(prop.createdBy) === String(currentUserId);
-                const isShared = prop.sharedWith?.some(id => String(id) === String(currentUserId));
-                if (!prop.showAddress && !isOwner && !isShared) {
-                    prop.address = 'Address Hidden';
-                }
-                return prop;
-            });
-
-        res.json(sanitized);
+      const currentUserId = req.user._id;
+      const { mine, status, is_deleted, page, limit } = req.query;
+  
+      let query = {};
+  
+      // ✅ Apply is_deleted filter (defaults to false)
+      if (is_deleted === 'true') {
+        query.is_deleted = true;
+      } else if (is_deleted === 'false' || !is_deleted) {
+        query.is_deleted = false;
+      }
+  
+      // 🔐 Filter only own properties if mine=true
+      if (mine === 'true') {
+        query.createdBy = currentUserId;
+      } else if (req.user.role !== 'admin') {
+        query.$or = [
+          { publicListing: true },
+          { createdBy: currentUserId },
+          { sharedWith: currentUserId },
+        ];
+      }
+  
+      // 🟡 Apply decisionStatus filter if provided
+      if (status) {
+        const statusArray = status.split(',').map(s => s.trim());
+        query.decisionStatus = { $in: statusArray };
+      }
+  
+      console.log('Final Query:', query);
+  
+      const shouldPaginate = page && limit;
+      let properties, total;
+  
+      if (shouldPaginate) {
+        const parsedPage = parseInt(page, 10);
+        const parsedLimit = parseInt(limit, 10);
+        const skip = (parsedPage - 1) * parsedLimit;
+  
+        [properties, total] = await Promise.all([
+          Property.find(query)
+            .populate('agentId', 'name email phoneNumber')
+            .sort({ createdAt: -1 })
+            .skip(skip)
+            .limit(parsedLimit),
+          Property.countDocuments(query),
+        ]);
+      } else {
+        properties = await Property.find(query)
+          .populate('agentId', 'name email phoneNumber')
+          .sort({ createdAt: -1 });
+      }
+  
+      const sanitized = req.user.role === 'admin'
+        ? properties
+        : properties.map((property) => {
+            const prop = property.toObject();
+            const isOwner = String(prop.createdBy) === String(currentUserId);
+            const isShared = prop.sharedWith?.some(id => String(id) === String(currentUserId));
+            if (!prop.showAddress && !isOwner && !isShared) {
+              prop.address = 'Address Hidden';
+            }
+            return prop;
+          });
+  
+      if (shouldPaginate) {
+        const parsedPage = parseInt(page, 10);
+        const parsedLimit = parseInt(limit, 10);
+        return res.json({
+          data: sanitized,
+          total,
+          page: parsedPage,
+          totalPages: Math.ceil(total / parsedLimit),
+        });
+      }
+  
+      return res.json(sanitized);
     } catch (error) {
-        console.error('Error fetching properties:', error);
-        res.status(500).json({ message: 'Error fetching properties.' });
+      console.error('Error fetching properties:', error);
+      res.status(500).json({ message: 'Error fetching properties.' });
     }
-});
+  });
+  
 
 
 

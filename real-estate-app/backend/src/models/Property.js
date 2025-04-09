@@ -2,8 +2,8 @@ const mongoose = require('mongoose');
 
 const PropertySchema = new mongoose.Schema({
     address: { type: String, required: true, trim: true },
-    isOffmarket: { type: Boolean, default: false },
-    subdivisionPotential: { type: Boolean, default: false },
+    isOffmarket: { type: String, default: "Not Sure" },
+    subdivisionPotential: { type: String, default: "Not Sure" },
     propertyLink: { type: String, trim: true },
     agentId: { type: mongoose.Schema.Types.ObjectId, ref: 'Agent' }, // Link to Agent model
     askingPrice: { type: String, trim: true },
@@ -14,9 +14,6 @@ const PropertySchema = new mongoose.Schema({
     askingPriceMax: { type: Number },
     rentPerWeek: { type: Number },
     rentalYieldPercent: { type: Number },
-
-    
-
     // Additional Property Details
     bedrooms: { type: Number, default: 0 },
     bathrooms: { type: Number, default: 0 },
@@ -33,7 +30,11 @@ const PropertySchema = new mongoose.Schema({
     nearbySchools: [{ type: String }], // Array of nearby schools
     publicTransport: [{ type: String }], // Array of transport links
     marketTrends: { type: String, trim: true },
-    tags: [{ type: String }],
+    tags: [{
+        name: { type: String, required: true },
+        type: { type: String, enum: ['location', 'feature', 'propertyType', 'region', 'user', 'other'], required: true }
+      }],
+
     mapsLink: { type: String, trim: true },
 
     landSizeNumeric: { type: Number, trim: true },
@@ -56,6 +57,14 @@ const PropertySchema = new mongoose.Schema({
             content: { type: String, required: true },
         }
     ],
+
+    publicConversations: [
+        {
+          name: { type: String, required: true }, // Optional if you want pseudonyms or names
+          message: { type: String, required: true },
+          timestamp: { type: Date, default: Date.now }
+        }
+      ],
 
     // **New: Notes Section**
     notes: [
@@ -109,6 +118,9 @@ const PropertySchema = new mongoose.Schema({
         floodZone: { type: String,  default: null },
         bushfireZone: { type: String,  default: null },
         socialHousing: { type: String,  default: null },
+        floodZoneEnum: { type: String,  default: null },
+        bushfireZoneEnum: { type: String,  default: null },
+        socialHousingEnum: { type: String,  default: null },
         // Allow dynamic fields for additional checks
         additionalChecks: [{ 
             name: { type: String, required: true },
@@ -124,14 +136,8 @@ const PropertySchema = new mongoose.Schema({
         default: []
       }
       
-      
-      
-    
-    
-
     // // Array of users with whom this property is shared
     // sharedWith: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
-
 
 
 }, { timestamps: true }); // Auto-generated createdAt & updatedAt fields
