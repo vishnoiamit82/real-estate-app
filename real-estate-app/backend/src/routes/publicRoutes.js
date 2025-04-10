@@ -61,22 +61,49 @@ const buildMongoQuery = (req, filters) => {
       is_deleted: false
     };
   
-    if (!req.user?._id) {
-      query.isCommunityShared = true;
-    } else {
-      query.$or = [
-        { isCommunityShared: true },
-        { createdBy: req.user._id }
-      ];
-    }
-  
     const isValidNumber = (value) =>
-        (typeof value === 'number' || typeof value === 'string') &&
-        !isNaN(Number(value));
-      
-    const isValidString = (val) => typeof val === 'string' && val.trim() && val.trim().toLowerCase() !== 'any';
+      (typeof value === 'number' || typeof value === 'string') &&
+      !isNaN(Number(value));
+  
+    const isValidString = (val) =>
+      typeof val === 'string' && val.trim() && val.trim().toLowerCase() !== 'any';
+  
     const isValidArray = (arr) => Array.isArray(arr) && arr.length > 0;
   
+    const accessClause = !req.user?._id
+      ? { isCommunityShared: true }
+      : {
+          $or: [
+            { isCommunityShared: true },
+            { createdBy: req.user._id }
+          ]
+        };
+  
+    const keyword = isValidString(filters.address) ? filters.address.trim() : null;
+  
+    const keywordClause = keyword
+      ? {
+          $or: [
+            { address: { $regex: keyword, $options: 'i' } },
+            { 'tags.name': { $regex: keyword, $options: 'i' } },
+            { 'agentId.name': { $regex: keyword, $options: 'i' } } 
+          ]
+        }
+      : null;
+  
+    // Combine access and keyword filter with $and if needed
+    if (keywordClause && req.user?._id) {
+      query.$and = [accessClause, keywordClause];
+    } else if (keywordClause) {
+      Object.assign(query, accessClause); // guest: keep `isCommunityShared: true`
+      Object.assign(query, keywordClause); // merge top-level address OR tags query
+    } else if (req.user?._id) {
+      query.$or = accessClause.$or;
+    } else {
+      query.isCommunityShared = true;
+    }
+  
+    // Other filters (safe to add after building access+keyword logic)
     if (isValidNumber(filters.bedrooms)) query.bedrooms = { $gte: Number(filters.bedrooms) };
     if (isValidNumber(filters.bathrooms)) query.bathrooms = { $gte: Number(filters.bathrooms) };
     if (isValidNumber(filters.carSpaces)) query.carSpaces = { $gte: Number(filters.carSpaces) };
@@ -95,16 +122,11 @@ const buildMongoQuery = (req, filters) => {
     if (isValidNumber(filters.rentalYieldMin) || isValidNumber(filters.rentalYieldMax)) {
       query.rentalYieldPercent = {};
       if (isValidNumber(filters.rentalYieldMin)) query.rentalYieldPercent.$gte = Number(filters.rentalYieldMin);
-      if (isValidNumber(filters.rentalYieldMax)) query.rentalYieldPercent.$lte = Number(ilters.rentalYieldMax);
+      if (isValidNumber(filters.rentalYieldMax)) query.rentalYieldPercent.$lte = Number(filters.rentalYieldMax);
     }
   
     if (isValidNumber(filters.landSizeMin)) query.landSizeSqm = { $gte: Number(filters.landSizeMin) };
-  
     if (isValidNumber(filters.yearBuiltMin)) query.yearBuiltNumeric = { $gte: Number(filters.yearBuiltMin) };
-  
-    // if (isValidArray(filters.locations)) {
-    //   query.address = { $regex: filters.locations.join('|'), $options: 'i' };
-    // }
   
     if (filters.isOffmarket !== undefined) query.isOffmarket = filters.isOffmarket;
     if (filters.subdivisionPotential !== undefined) query.subdivisionPotential = filters.subdivisionPotential;
@@ -114,19 +136,17 @@ const buildMongoQuery = (req, filters) => {
     }
   
     const regexOrIn = (field, value) => {
-        if (Array.isArray(value)) {
-          const values = value
-            .map(v => (typeof v === 'string' ? v : v?.name))
-            .filter(Boolean); // remove undefined/null
-      
-          if (values.length > 0) {
-            query[field] = { $in: values.map(v => new RegExp(v, 'i')) };
-          }
-        } else if (typeof value === 'string' && value.trim()) {
-          query[field] = { $regex: value, $options: 'i' };
+      if (Array.isArray(value)) {
+        const values = value
+          .map(v => (typeof v === 'string' ? v : v?.name))
+          .filter(Boolean);
+        if (values.length > 0) {
+          query[field] = { $in: values.map(v => new RegExp(v, 'i')) };
         }
-      };
-      
+      } else if (typeof value === 'string' && value.trim()) {
+        query[field] = { $regex: value, $options: 'i' };
+      }
+    };
   
     regexOrIn("floodZone", filters.floodZone);
     regexOrIn("bushfireZone", filters.bushfireZone);
@@ -150,96 +170,118 @@ const buildMongoQuery = (req, filters) => {
       regexOrIn("dueDiligence.socialHousing", filters.dueDiligence.socialHousing);
     }
   
-    console.log("Mongo DB query", query);
+    console.log("Mongo DB query", JSON.stringify(query, (key, value) => {
+        if (value instanceof RegExp) {
+          return value.toString(); // Convert RegExp to string for debugging
+        }
+        return value;
+      }, 2));
+      
     return query;
   };
   
 
-  
 
 // Main route
 router.post('/ai-search-preview', async (req, res) => {
-  const { query } = req.body;
-  if (!query) return res.status(400).json({ message: 'Search query is required.' });
+    const { query } = req.body;
+    if (!query) return res.status(400).json({ message: 'Search query is required.' });
 
-  try {
-    // 1. Prepare and send GPT request
-    const prompt = buildSearchPrompt(query);
+    try {
+        // 1. Prepare and send GPT request
+        const prompt = buildSearchPrompt(query);
 
-    const gptRes = await axios.post(
-      'https://api.openai.com/v1/chat/completions',
-      {
-        model: 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: 'You are a helpful assistant that extracts search filters from real estate queries.' },
-          { role: 'user', content: prompt }
-        ],
-        temperature: 0.3
-      },
-      {
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
+        const gptRes = await axios.post(
+            'https://api.openai.com/v1/chat/completions',
+            {
+                model: 'gpt-3.5-turbo',
+                messages: [
+                    { role: 'system', content: 'You are a helpful assistant that extracts search filters from real estate queries.' },
+                    { role: 'user', content: prompt }
+                ],
+                temperature: 0.3
+            },
+            {
+                headers: {
+                    'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                    'Content-Type': 'application/json'
+                }
+            }
+        );
 
-    console.log ("chatgpt response", gptRes.data.choices)
+        console.log("chatgpt response", gptRes.data.choices)
 
-    let parsedFilters = gptRes.data.choices[0].message.content.replace(/```json|```/g, '');
-    parsedFilters = JSON.parse(parsedFilters);
+        let parsedFilters = gptRes.data.choices[0].message.content.replace(/```json|```/g, '');
+        parsedFilters = JSON.parse(parsedFilters);
 
-    // 2. Save user query to DB
-    await AISearchQuery.create({
-      userId: req.user?._id || null,
-      rawQuery: query,
-      parsedFilters
-    });
+        // 2. Save user query to DB
+        await AISearchQuery.create({
+            userId: req.user?._id || null,
+            rawQuery: query,
+            parsedFilters
+        });
 
-    // 3. Build and run MongoDB query
-    // const mongoQuery = buildMongoQuery(req, parsedFilters);
-    // const results = await Property.find(mongoQuery).limit(30).lean();
+        // 3. Build and run MongoDB query
+        // const mongoQuery = buildMongoQuery(req, parsedFilters);
+        // const results = await Property.find(mongoQuery).limit(30).lean();
 
-    // 4. Respond
-    res.status(200).json({ parsedFilters });
+        // 4. Respond
+        res.status(200).json({ parsedFilters });
 
-  } catch (err) {
-    console.error('AI search error:', err.response?.data || err.message);
-    res.status(500).json({ message: 'Error processing search query.' });
-  }
+    } catch (err) {
+        console.error('AI search error:', err.response?.data || err.message);
+        res.status(500).json({ message: 'Error processing search query.' });
+    }
 });
 
 router.post('/property/search', async (req, res) => {
     const filters = req.body;
 
-    console.log (filters)
-  
+    console.log(filters)
+
     try {
-      const mongoQuery = buildMongoQuery(req, filters); // Use your existing utility
-      console.log ("mongoQuery", mongoQuery)
-      const results = await Property.find(mongoQuery).limit(30).lean();
-      res.status(200).json({ results });
+        const mongoQuery = buildMongoQuery(req, filters); // Use your existing utility
+        // console.log("mongoQuery", mongoQuery)
+        const results = await Property.find(mongoQuery).limit(30).lean();
+        res.status(200).json({ results });
     } catch (err) {
-      console.error('Property search error:', err);
-      res.status(500).json({ message: 'Error processing property search.' });
+        console.error('Property search error:', err);
+        res.status(500).json({ message: 'Error processing property search.' });
     }
-  });
+});
 
 
 
 router.get('/property/tags', async (req, res) => {
-  try {
-    const tags = await Tag.find({}, { _id: 0, name: 1, type: 1 }).sort({ name: 1 }); // Get only name + type
-    res.json(tags);
-  } catch (err) {
-    console.error("Error fetching tags:", err);
-    res.status(500).json({ message: "Failed to retrieve tags." });
-  }
+    try {
+        const tags = await Tag.find({}, { _id: 0, name: 1, type: 1 }).sort({ name: 1 }); // Get only name + type
+        res.json(tags);
+    } catch (err) {
+        console.error("Error fetching tags:", err);
+        res.status(500).json({ message: "Failed to retrieve tags." });
+    }
 });
 
-  
 
-  
+router.get('/property/tags', async (req, res) => {
+    try {
+        const tags = await Tag.find({}, { _id: 0, name: 1, type: 1 }).sort({ name: 1 }); // Get only name + type
+        res.json(tags);
+    } catch (err) {
+        console.error("Error fetching tags:", err);
+        res.status(500).json({ message: "Failed to retrieve tags." });
+    }
+});
 
-  
-  module.exports = router;
+// Express-style
+router.get('/ping', async (req, res) => {
+    res.status(200).send('pong');
+});
+
+
+
+
+
+
+
+module.exports = router;

@@ -10,10 +10,12 @@ console.log("✅ NODE_ENV:", process.env.NODE_ENV);
 // Load environment-specific `.env` file
 if (process.env.NODE_ENV === "production") {
     dotenv.config({ path: ".env.production" });
-} else {
+} else if(process.env.NODE_ENV === "test"){
+    dotenv.config({ path: ".env.test" });
+}
+else {
     dotenv.config({ path: ".env.local" });
 }
-
 
 const deleteAdminUser = async () => {
     try {

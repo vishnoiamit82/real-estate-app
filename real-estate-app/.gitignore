@@ -1,3 +1,4 @@
 node_modules/
 backend/src/.env.local  
 backend/src/.env.production
+backend/src/.env.test

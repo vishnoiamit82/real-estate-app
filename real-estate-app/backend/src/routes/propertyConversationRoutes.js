@@ -7,7 +7,7 @@ const { authMiddleware,authorize } = require('../middlewares/authMiddleware');
 
 
 
-router.get('/unread-counts', authMiddleware, async (req, res) => {
+router.get('/unread-counts', async (req, res) => {
   try {
     const { ids } = req.query;
 
@@ -48,7 +48,7 @@ router.get('/unread-counts', authMiddleware, async (req, res) => {
 
 
 // GET all conversations for a property
-router.get('/:propertyId', async (req, res) => {
+router.get('/:propertyId', authMiddleware,  async (req, res) => {
   try {
     const messages = await PropertyConversation.find({ propertyId: req.params.propertyId })
       .sort({ timestamp: -1 });

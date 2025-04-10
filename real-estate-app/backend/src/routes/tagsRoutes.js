@@ -22,7 +22,7 @@ router.post(
   (req, res, next) => {
     req.route.settings = { permissions: ['edit_tags'] };
     next();
-  },
+  },authMiddleware,
   authorize(['edit_tags']),
   async (req, res) => {
     try {
@@ -47,6 +47,7 @@ router.put(
     req.route.settings = { permissions: ['edit_tags'] };
     next();
   },
+  authMiddleware,
   authorize(['edit_tags']),
   async (req, res) => {
     try {
@@ -70,6 +71,7 @@ router.delete(
     req.route.settings = { permissions: ['edit_tags'] };
     next();
   },
+  authMiddleware,
   authorize(['edit_tags']),
   async (req, res) => {
     try {

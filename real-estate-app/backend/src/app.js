@@ -45,15 +45,18 @@ const tagsRoutes = require('./routes/tagsRoutes');
 // Load environment-specific `.env` file
 if (process.env.NODE_ENV === "production") {
     dotenv.config({ path: ".env.production" });
-} else {
+} else if(process.env.NODE_ENV === "test"){
+    dotenv.config({ path: ".env.test" });
+}
+else {
     dotenv.config({ path: ".env.local" });
 }
-
 
 // ✅ CORS Configuration for Local and Production Environments
 const allowedOrigins = [
     'http://localhost:3000', // Local frontend
-    'https://buyers-agent-ui.vercel.app' // Production frontend
+    'https://buyers-agent-ui.vercel.app', // Production frontend,
+    'https://www.propsourcing.com.au'
 ];
 
 const corsOptions = {
@@ -131,9 +134,9 @@ app.use('/api/email-replies', emailRepliesRoutes);
 
 app.use('/api/saved-properties', authMiddleware, savedPropertyRoutes);
 
-app.use('/api/property-conversations', authMiddleware, propertyConversationRoute);
+app.use('/api/property-conversations', propertyConversationRoute);
 app.use('/api/ai-search-queries', authMiddleware, adminQueriesRoutes);
-app.use('/api/tags', authMiddleware, tagsRoutes);
+app.use('/api/tags', tagsRoutes);
 
 
 
