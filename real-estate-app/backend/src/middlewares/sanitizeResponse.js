@@ -20,7 +20,7 @@ function sanitizeResponseMiddleware(req, res, next) {
 
         for (const key in clone) {
           if (Array.isArray(clone[key])) {
-            console.log(`🔁 Recursively sanitizing array at key: ${key}`);
+            // console.log(`🔁 Recursively sanitizing array at key: ${key}`);
             clone[key] = clone[key].map((item) => maybeSanitize(item, userId));
           } else if (typeof clone[key] === 'object' && clone[key] !== null) {
             clone[key] = maybeSanitize(clone[key], userId);
@@ -44,13 +44,13 @@ function sanitizeResponseMiddleware(req, res, next) {
         item.hasOwnProperty('address') &&
         item.hasOwnProperty('propertyType');
 
-      console.log('🔍 Item detected:', {
-        id: item._id,
-        hasAddress: item.hasOwnProperty('address'),
-        hasPropertyType: item.hasOwnProperty('propertyType'),
-        hasCreatedBy: item.hasOwnProperty('createdBy'),
-        createdBy: item.createdBy,
-      });
+      // console.log('🔍 Item detected:', {
+      //   id: item._id,
+      //   hasAddress: item.hasOwnProperty('address'),
+      //   hasPropertyType: item.hasOwnProperty('propertyType'),
+      //   hasCreatedBy: item.hasOwnProperty('createdBy'),
+      //   createdBy: item.createdBy,
+      // });
 
       if (isPropertyObject) {
         let context = 'external';
