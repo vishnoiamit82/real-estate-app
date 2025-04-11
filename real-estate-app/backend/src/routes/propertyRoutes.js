@@ -356,6 +356,7 @@ router.get('/community', async (req, res) => {
         since.setDate(since.getDate() - days);
         query.createdAt = { $gte: since };
       }
+      
   
       const skip = (parseInt(page) - 1) * parseInt(limit);
   
@@ -411,6 +412,10 @@ router.get('/community', async (req, res) => {
           { createdBy: currentUserId },
           { sharedWith: currentUserId },
         ];
+      }
+
+      if (typeof req.query.isCommunityShared === 'string') {
+        query.isCommunityShared = req.query.isCommunityShared === 'true';
       }
   
       // 🟡 Apply decisionStatus filter if provided
