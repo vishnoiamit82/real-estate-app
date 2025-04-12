@@ -107,6 +107,7 @@ const PropertySchema = new mongoose.Schema({
     shareToken: { type: String, default: null },
     isCommunityShared: { type: Boolean, default: false },
     sharedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    sharedAt: { type: Date, default: null },
 
     
 

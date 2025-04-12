@@ -79,22 +79,22 @@ const buildMongoQuery = (req, filters) => {
   const accessClause = !req.user?._id
     ? { isCommunityShared: true }
     : {
-        $or: [
-          { isCommunityShared: true },
-          { createdBy: req.user._id }
-        ]
-      };
+      $or: [
+        { isCommunityShared: true },
+        { createdBy: req.user._id }
+      ]
+    };
 
   const keyword = isValidString(filters.address) ? filters.address.trim() : null;
 
   const keywordClause = keyword
     ? {
-        $or: [
-          { address: { $regex: keyword, $options: 'i' } },
-          { 'tags.name': { $regex: keyword, $options: 'i' } },
-          { 'agentId.name': { $regex: keyword, $options: 'i' } }
-        ]
-      }
+      $or: [
+        { address: { $regex: keyword, $options: 'i' } },
+        { 'tags.name': { $regex: keyword, $options: 'i' } },
+        { 'agentId.name': { $regex: keyword, $options: 'i' } }
+      ]
+    }
     : null;
 
   // Combine access and keyword filter with $and if needed
@@ -181,7 +181,7 @@ const buildMongoQuery = (req, filters) => {
 
   console.log("Mongo DB query", JSON.stringify(query, (key, value) =>
     value instanceof RegExp ? value.toString() : value,
-  2));
+    2));
 
   return query;
 };
@@ -252,10 +252,26 @@ router.post('/property/search', async (req, res) => {
     const mongoQuery = buildMongoQuery(req, req.body);
 
     const skip = (Number(page) - 1) * Number(limit);
-    const sort = { [sortKey]: sortOrder === 'asc' ? 1 : -1 };
+    
+    let sort = {};
+    if (sortKey === 'sharedAt') {
+      // Compound sort: first by sharedAt, fallback by createdAt
+      sort = {
+        sharedAt: sortOrder === 'asc' ? 1 : -1,
+        createdAt: sortOrder === 'asc' ? 1 : -1,
+      };
+    } else {
+      sort = { [sortKey]: sortOrder === 'asc' ? 1 : -1 };
+    }
+
 
     const [results, totalCount, allCount] = await Promise.all([
-      Property.find(mongoQuery).sort(sort).skip(skip).limit(Number(limit)).lean(),
+      Property.find(mongoQuery)
+      .sort(sort)
+      .skip(skip)
+      .limit(Number(limit))
+      .populate('sharedBy', 'name') // ✅ Include sharedBy details
+      .lean(),
       Property.countDocuments(mongoQuery), // count with filters
       Property.countDocuments({ isCommunityShared: true, is_deleted: false }) // 🔁 count without filters
     ]);
