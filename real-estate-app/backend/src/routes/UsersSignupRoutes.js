@@ -29,17 +29,22 @@ router.post('/', async (req, res) => {
             email,
             password: hashedPassword,
             phoneNumber,
-            role: 'property_sourcer',
+            goals: req.body.goals || [], // user interest during signup
+            licenseNumber: req.body.licenseNumber || '',
+            role: 'property_sourcer', // default role, can be updated by admin
             subscriptionTier: 'free',
-            permissions: getPermissions("property_sourcer", "free") || []
-        });
+            permissions: getPermissions('property_sourcer', 'free') || [],
+            isApproved: false,
+            isEmailVerified: false
+          });
+          
 
         await user.save();
 
         // ✅ Send email with approval process messaging
         const msg = {
             to: email,
-            from: process.env.SENDGRID_FROM_EMAIL,
+            from: `Amit from Propsourcing <${process.env.SENDGRID_FROM_EMAIL}>`,
             cc: process.env.SENDGRID_FROM_EMAIL,
             subject: `Thank you for signing up, ${name}!`,
             text: `Hi ${name},\n\nThanks for signing up to our platform. Your account is currently under review as part of our approval process. You’ll receive a confirmation email once your account is approved and activated.\n\nIn the meantime, feel free to explore our platform or reach out if you have any questions.\n\nRegards,\nThe Team`,

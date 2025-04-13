@@ -5,7 +5,7 @@ sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 const sendEmail = async ({ to, subject, text, html }) => {
   const msg = {
     to,
-    from: process.env.SENDGRID_FROM_EMAIL, // e.g. 'no-reply@yourapp.com'
+    from: `Amit via Propsourcing <${process.env.SENDGRID_FROM_EMAIL}>`, // e.g. 'no-reply@yourapp.com'
     subject,
     text,
     html,

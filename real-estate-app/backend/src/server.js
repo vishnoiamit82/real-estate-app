@@ -46,7 +46,7 @@ const seedAdminUser = async () => {
         const adminPassword = process.env.ADMIN_PASSWORD;
 
         // Check if an existing admin user exists
-        const existingAdmin = await User.findOne({ role: 'admin' });
+        const existingAdmin = await User.findOne({ email: adminEmail });
         if (existingAdmin) {
             console.log('🗑️ Existing admin user found. Deleting...');
             await User.deleteOne({ _id: existingAdmin._id });

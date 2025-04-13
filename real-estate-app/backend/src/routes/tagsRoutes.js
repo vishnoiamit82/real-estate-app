@@ -54,7 +54,7 @@ router.patch(
       const requesterName = requester?.name || 'Unknown User';
       const requesterEmail = requester?.email || null;
 
-      const adminEmail = process.env.ADMIN_EMAIL || 'amit@propsourcing.com.au';
+      const adminEmail = process.env.TAGS_ADMIN_EMAIL || 'amit@propsourcing.com.au';
 
       // ✅ Email to admin
       await sendEmail({
@@ -71,7 +71,7 @@ router.patch(
         const userMsg =
           status === 'approved'
             ? `Your tag request for "${tagName}" has been approved and is now live.`
-            : `Your tag request for "${tagName}" has been reviewed and was not approved at this time.`;
+            : `Your tag request for "${tagName}" has been reviewed and was not approved at this time.  A similar tag may already exist, or an improved alternative has been created to ensure better consistency across the platform.`;
 
         await sendEmail({
           to: requesterEmail,
@@ -198,7 +198,7 @@ router.post('/request', authMiddleware, async (req, res) => {
 
     // ✅ Email to Admin
     await sendEmail({
-      to: process.env.ADMIN_EMAIL || 'amit@propsourcing.com.au',
+      to: process.env.TAGS_ADMIN_EMAIL || 'amit@propsourcing.com.au',
       subject: `🆕 New Tag Request: "${trimmedName}"`,
       text: `A new tag "${trimmedName}" has been requested by ${userName} (${userEmail}, ID: ${userId})`,
       html: `

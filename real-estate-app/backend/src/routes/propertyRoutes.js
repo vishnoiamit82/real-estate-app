@@ -397,18 +397,27 @@ router.get('/community', async (req, res) => {
 router.get('/', authMiddleware, authorize(['view_property']), async (req, res) => {
     try {
         const currentUserId = req.user._id;
-        const { mine, status, is_deleted, page, limit } = req.query;
+        const {
+            minPrice,
+            maxPrice,
+            postedWithinDays,
+            sortKey = 'createdAt',
+            sortOrder = 'desc',
+            mine = 'false',
+            status = '',
+            is_deleted = 'false',
+            isCommunityShared,
+            page,
+            limit,
+            search = ''
+        } = req.query;
 
-        let query = {};
+        const query = {};
 
-        // ✅ Apply is_deleted filter (defaults to false)
-        if (is_deleted === 'true') {
-            query.is_deleted = true;
-        } else if (is_deleted === 'false' || !is_deleted) {
-            query.is_deleted = false;
-        }
+        // ✅ Deleted filter (default: false)
+        query.is_deleted = is_deleted === 'true';
 
-        // 🔐 Filter only own properties if mine=true
+        // 🔐 Ownership filter
         if (mine === 'true') {
             query.createdBy = currentUserId;
         } else if (req.user.role !== 'admin') {
@@ -419,72 +428,97 @@ router.get('/', authMiddleware, authorize(['view_property']), async (req, res) =
             ];
         }
 
-        if (typeof req.query.isCommunityShared === 'string') {
-            query.isCommunityShared = req.query.isCommunityShared === 'true';
+        if (minPrice || maxPrice) {
+            query.askingPriceMin = {};
+            if (minPrice) query.askingPriceMin.$gte = Number(minPrice);
+            if (maxPrice) query.askingPriceMin.$lte = Number(maxPrice);
         }
 
-        // 🟡 Apply decisionStatus filter if provided
-        if (status) {
+        if (postedWithinDays) {
+            const daysAgo = new Date();
+            daysAgo.setDate(daysAgo.getDate() - parseInt(postedWithinDays));
+            query.createdAt = { $gte: daysAgo };
+        }
+
+        const sortField = sortKey;
+        const sortDirection = sortOrder === 'asc' ? 1 : -1;
+
+
+
+
+        // 🌍 Community shared
+        if (typeof isCommunityShared === 'string') {
+            query.isCommunityShared = isCommunityShared === 'true';
+        }
+
+        // 🧠 Search by address (optional fuzzy)
+        if (search) {
+            query.address = { $regex: search, $options: 'i' };
+        }
+
+        // 🟡 Status filter
+        if (status.trim()) {
             const statusArray = status.split(',').map(s => s.trim());
             query.decisionStatus = { $in: statusArray };
         }
 
-        console.log('Final Query:', query);
+        console.log('📦 Final Property Query:', query);
 
-        const shouldPaginate = page && limit;
+        const shouldPaginate = !!(page && limit);
         let properties, total;
 
+        console.log ("query123", query)
+
         if (shouldPaginate) {
-            const parsedPage = parseInt(page, 10);
-            const parsedLimit = parseInt(limit, 10);
+            const parsedPage = parseInt(page, 10) || 1;
+            const parsedLimit = parseInt(limit, 10) || 20;
             const skip = (parsedPage - 1) * parsedLimit;
 
             [properties, total] = await Promise.all([
                 Property.find(query)
                     .populate('agentId', 'name email phoneNumber')
-                    .sort({ createdAt: -1 })
+                    .sort({ [sortField]: sortDirection })
                     .skip(skip)
                     .limit(parsedLimit),
                 Property.countDocuments(query),
             ]);
-        } else {
-            properties = await Property.find(query)
-                .populate('agentId', 'name email phoneNumber')
-                .sort({ createdAt: -1 });
-        }
 
-        const sanitized = req.user.role === 'admin'
-            ? properties
-            : properties.map((property) => {
-                const prop = property.toObject();
-                const isOwner = String(prop.createdBy) === String(currentUserId);
-                const isShared = prop.sharedWith?.some(id => String(id) === String(currentUserId));
-                if (!prop.showAddress && !isOwner && !isShared) {
-                    prop.address = 'Address Hidden';
-                }
-                return prop;
-            });
+            const sanitized = sanitizeProperties(properties, currentUserId, req.user.role);
 
-        if (shouldPaginate) {
-            const parsedPage = parseInt(page, 10);
-            const parsedLimit = parseInt(limit, 10);
             return res.json({
                 data: sanitized,
                 total,
                 page: parsedPage,
                 totalPages: Math.ceil(total / parsedLimit),
             });
-        }
+        } else {
+            properties = await Property.find(query)
+                .populate('agentId', 'name email phoneNumber')
+                .sort({ createdAt: -1 });
 
-        return res.json(sanitized);
+            const sanitized = sanitizeProperties(properties, currentUserId, req.user.role);
+            return res.json(sanitized);
+        }
     } catch (error) {
-        console.error('Error fetching properties:', error);
+        console.error('❌ Error fetching properties:', error);
         res.status(500).json({ message: 'Error fetching properties.' });
     }
 });
 
-
-
+// 🔒 Sanitize output for non-admin users
+function sanitizeProperties(properties, userId, role) {
+    return role === 'admin'
+        ? properties
+        : properties.map((prop) => {
+            const obj = prop.toObject();
+            const isOwner = String(obj.createdBy) === String(userId);
+            const isShared = obj.sharedWith?.some(id => String(id) === String(userId));
+            if (!obj.showAddress && !isOwner && !isShared) {
+                obj.address = 'Address Hidden';
+            }
+            return obj;
+        });
+}
 
 // ✅ PATCH: Update Property Status
 router.patch('/:id/status', authMiddleware, authorize(['edit_property']), async (req, res) => {

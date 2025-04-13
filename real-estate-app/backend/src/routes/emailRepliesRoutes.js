@@ -9,6 +9,21 @@ const verifySendGridRequest = require('../middlewares/verifySendgridRequest');
 
 
 
+
+function parseEmailField(raw) {
+  if (!raw || typeof raw !== 'string') return { name: '', email: '' };
+  const match = raw.match(/^(.*?)[<\\(]?([\\w._%+-]+@[\\w.-]+\\.[a-zA-Z]{2,})[>\\)]?$/);
+  if (match) {
+    return {
+      name: match[1].replace(/["']/g, '').trim(),
+      email: match[2].trim()
+    };
+  } else {
+    return { name: '', email: raw.trim() };
+  }
+}
+
+
 router.post('/', upload.any(), verifySendGridRequest, async (req, res) => {
   try {
     // Step 1: Save raw payload
@@ -33,8 +48,13 @@ router.post('/', upload.any(), verifySendGridRequest, async (req, res) => {
       parsedFields[field.fieldname] = field.buffer?.toString('utf8') || '';
     });
 
-    const from = parsedFields.from || req.body.from;
-    const to = parsedFields.to || req.body.to;
+    const rawFrom = parsedFields.from || req.body.from;
+    const rawTo = parsedFields.to || req.body.to;
+    
+    const from = parseEmailField(rawFrom);
+    const to = parseEmailField(rawTo);
+
+    
     const subject = parsedFields.subject || req.body.subject;
     const html = parsedFields.html || req.body.html;
     const text = parsedFields.text || req.body.text;

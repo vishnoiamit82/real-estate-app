@@ -7,9 +7,8 @@ const userSchema = new mongoose.Schema({
   phoneNumber: { type: String },
 
   // 🔹 Role-based access (assigned by admin)
-  roles: {
-    type: [String],
-    enum: ['client', 'buyers_agent', 'sales_agent', 'external_partner', 'staff', 'admin', 'property_sourcer'],
+  role: {
+    type: String,
     default: ['property_sourcer']
   },
 

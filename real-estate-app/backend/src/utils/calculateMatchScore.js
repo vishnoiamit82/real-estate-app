@@ -115,15 +115,27 @@ const calculateMatchScore = (property, clientBrief) => {
     // Location
     const locationWeight = getWeight(w, 'location');
     maxScore += 15 * locationWeight;
-    if (Array.isArray(clientBrief.preferredLocations) && property.address) {
-        const matches = clientBrief.preferredLocations.filter(loc => property.address.toLowerCase().includes(loc.toLowerCase()));
-        if (matches.length > 0) {
-            const partialPoints = Math.round((matches.length / clientBrief.preferredLocations.length) * 15 * locationWeight);
-            addScore(`📍 Location matched (${matches.join(', ')})`, partialPoints, '📍 Location Match');
-        } else {
-            unmatchedCriteria.push({ field: 'location', message: 'Address does not match any preferred locations' });
-        }
+    
+    if (Array.isArray(clientBrief.preferredLocations) && Array.isArray(property.tags)) {
+      const locationTags = property.tags
+        .filter(tag => tag.type === 'location')
+        .map(tag => tag.name.toLowerCase());
+    
+      const matchedLocations = clientBrief.preferredLocations.filter(loc =>
+        locationTags.includes(loc.toLowerCase())
+      );
+    
+      if (matchedLocations.length > 0) {
+        const partialPoints = Math.round((matchedLocations.length / clientBrief.preferredLocations.length) * 15 * locationWeight);
+        addScore(`📍 Location matched (${matchedLocations.join(', ')})`, partialPoints, '📍 Location Match');
+      } else {
+        unmatchedCriteria.push({
+          field: 'location',
+          message: 'None of the preferred locations matched the property location tags.'
+        });
+      }
     }
+    
 
     // Bedrooms
     const bedWeight = getWeight(w, 'bedrooms');
