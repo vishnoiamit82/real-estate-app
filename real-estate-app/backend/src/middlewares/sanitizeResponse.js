@@ -44,16 +44,9 @@ function sanitizeResponseMiddleware(req, res, next) {
         item.hasOwnProperty('address') &&
         item.hasOwnProperty('propertyType');
 
-      // console.log('🔍 Item detected:', {
-      //   id: item._id,
-      //   hasAddress: item.hasOwnProperty('address'),
-      //   hasPropertyType: item.hasOwnProperty('propertyType'),
-      //   hasCreatedBy: item.hasOwnProperty('createdBy'),
-      //   createdBy: item.createdBy,
-      // });
-
       if (isPropertyObject) {
         let context = 'external';
+        let isOwner = false;
 
         const createdById =
           typeof item.createdBy === 'object'
@@ -62,17 +55,20 @@ function sanitizeResponseMiddleware(req, res, next) {
 
         if (userId && createdById && createdById === userId) {
           context = 'owner';
+          isOwner = true;
         }
 
-        // console.log('🔒 Sanitizing property with context:', context);
         const sanitized = sanitizeProperty(item, context);
-        // console.log('✅ Sanitized Property:', sanitized);
-        return sanitized;
+        return {
+          ...sanitized,
+          isOwner, // ✅ Inject ownership flag
+        };
       }
 
       console.log('⛔ Not a property object — skipping sanitization');
       return item;
     };
+
 
     return originalJson.call(this, sanitize(data));
   };
