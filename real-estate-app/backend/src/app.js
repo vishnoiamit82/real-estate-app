@@ -38,6 +38,8 @@ const authRoutes = require('./routes/auth'); // contains /refresh endpoint
 const publicRoutes = require('./routes/publicRoutes');
 const adminQueriesRoutes = require('./routes/adminQueriesRoutes');
 const tagsRoutes = require('./routes/tagsRoutes');
+const communityMessagesRoutes = require('./routes/communityMessagesRoutes');
+
 
 
 
@@ -137,6 +139,10 @@ app.use('/api/saved-properties', authMiddleware, savedPropertyRoutes);
 app.use('/api/property-conversations', propertyConversationRoute);
 app.use('/api/ai-search-queries', authMiddleware, adminQueriesRoutes);
 app.use('/api/tags', tagsRoutes);
+
+app.use('/api/community-messages', authMiddleware, communityMessagesRoutes);
+
+
 
 
 

@@ -51,6 +51,9 @@ router.post("/", async (req, res) => {
         from: process.env.SENDGRID_FROM_EMAIL,
         subject: "Password Reset Request",
         html: `<p>Click <a href="${resetLink}">here</a> to reset your password. The link expires in 1 hour.</p>`,
+        trackingSettings: {
+            clickTracking: { enable: false, enableText: false },
+        }
     };
 
     await sgMail.send(msg);

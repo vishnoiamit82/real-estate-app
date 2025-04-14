@@ -12,7 +12,10 @@ router.post('/', async (req, res) => {
 
        
         // Find user by email
-        const user = await User.findOne({ email });
+        const user = await User.findOne({
+            email: new RegExp(`^${email}$`, 'i')  // ^ and $ ensure full string match, 'i' makes it case-insensitive
+          });
+          
         if (!user) {
             return res.status(404).json({ message: 'User not found' });
         }
