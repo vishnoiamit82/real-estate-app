@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema({
 
   // 🔹 Role-based access (assigned by admin)
   role: {
-    type: String,
+    type: [String],
     default: ['property_sourcer']
   },
 
