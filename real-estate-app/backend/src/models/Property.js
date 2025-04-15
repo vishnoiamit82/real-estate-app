@@ -19,7 +19,7 @@ const PropertySchema = new mongoose.Schema({
     bathrooms: { type: Number, default: 0 },
     carSpaces: { type: Number, default: 0 },
     landSize: { type: String, trim: true },
-    propertyType: { type: String, trim: true },
+    propertyType: { type: String, default: 'house', trim: true },
     yearBuilt: { type: String, trim: true },
     features: [{ type: String }], // Array of features
     councilRate: { type: String, trim: true },

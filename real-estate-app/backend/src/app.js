@@ -138,7 +138,7 @@ app.use('/api/saved-properties', authMiddleware, savedPropertyRoutes);
 
 app.use('/api/property-conversations', propertyConversationRoute);
 app.use('/api/ai-search-queries', authMiddleware, adminQueriesRoutes);
-app.use('/api/tags', tagsRoutes);
+app.use('/api/tags',authMiddleware, tagsRoutes);
 
 app.use('/api/community-messages', authMiddleware, communityMessagesRoutes);
 

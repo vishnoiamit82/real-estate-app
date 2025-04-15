@@ -291,26 +291,35 @@ router.post('/property/search', async (req, res) => {
 
 
 
-router.get('/property/tags', async (req, res) => {
-  try {
-    const tags = await Tag.find({}, { _id: 0, name: 1, type: 1 }).sort({ name: 1 }); // Get only name + type
-    res.json(tags);
-  } catch (err) {
-    console.error("Error fetching tags:", err);
-    res.status(500).json({ message: "Failed to retrieve tags." });
-  }
-});
+// router.get('/property/tags', async (req, res) => {
+//   try {
+//     const query = {};
+//     if (req.query.search) {
+//       query.name = { $regex: req.query.search, $options: 'i' };
+//     }
+
+//     const tags = await Tag.find(query, { _id: 0, name: 1, type: 1 })
+//       .limit(50)
+//       .sort({ name: 1 });
+
+//     res.json(tags);
+//   } catch (err) {
+//     console.error("Error fetching tags:", err);
+//     res.status(500).json({ message: "Failed to retrieve tags." });
+//   }
+// });
 
 
-router.get('/property/tags', async (req, res) => {
-  try {
-    const tags = await Tag.find({}, { _id: 0, name: 1, type: 1 }).sort({ name: 1 }); // Get only name + type
-    res.json(tags);
-  } catch (err) {
-    console.error("Error fetching tags:", err);
-    res.status(500).json({ message: "Failed to retrieve tags." });
-  }
-});
+
+// router.get('/property/tags', async (req, res) => {
+//   try {
+//     const tags = await Tag.find({}, { _id: 0, name: 1, type: 1 }).sort({ name: 1 }); // Get only name + type
+//     res.json(tags);
+//   } catch (err) {
+//     console.error("Error fetching tags:", err);
+//     res.status(500).json({ message: "Failed to retrieve tags." });
+//   }
+// });
 
 // Express-style
 router.get('/ping', async (req, res) => {

@@ -8,18 +8,27 @@ const sendEmail = require('../utils/sendEmail'); // adjust path
 const User = require('../models/Users'); // make sure this is imported
 
 
-// GET all tags (admin only)
-router.get(
-  '/',
-  async (req, res) => {
-    try {
-      const tags = await Tag.find({});
-      res.status(200).json(tags);
-    } catch (error) {
-      res.status(500).json({ message: 'Failed to fetch tags', error });
-    }
+
+// GET /tags?type=location&search=alb&limit=50
+router.get('/', authMiddleware, async (req, res) => {
+  try {
+    const { type, search, limit = 100 } = req.query;
+
+    const query = {};
+    if (type) query.type = type;
+    if (search) query.name = { $regex: search, $options: 'i' }; // case-insensitive search
+
+    const tags = await Tag.find(query)
+      .limit(parseInt(limit))
+      .sort({ name: 1 });
+
+    res.status(200).json(tags);
+  } catch (error) {
+    console.error('Failed to fetch tags:', error);
+    res.status(500).json({ message: 'Failed to fetch tags', error });
   }
-);
+});
+
 
 
 
