@@ -8,18 +8,19 @@ const router = express.Router();
 router.post('/calculate', async (req, res) => {
     try {
         const {
-            propertyId, 
-            clientId, 
-            purchasePrice, 
-            loanAmount, 
-            lvrPercentage, 
-            councilRate, 
-            maintenance, 
-            insurance, 
-            propertyManagementFee, 
+            propertyId,
+            clientId,
+            purchasePrice,
+            loanAmount,
+            lvrPercentage,
+            councilRate,
+            maintenance,
+            insurance,
+            propertyManagementFee,
             rentalIncome,
-            loanTerm // Added loan term to calculate P+I
-        } = req.body; 
+            loanTerm, // Added loan term to calculate P+I
+            manualInterestRate
+        } = req.body;
 
         // Convert all values to integers to avoid NaN issues
         const parsedPurchasePrice = parseInt(purchasePrice) || 0;
@@ -32,12 +33,18 @@ router.post('/calculate', async (req, res) => {
         const parsedRentalIncome = parseInt(rentalIncome) || 0;
         const parsedLoanTerm = parseInt(loanTerm) || 30; // Default loan term to 30 years
 
-        // Fetch client brief for interest rate
-        const client = await ClientBrief.findById(clientId);
-        if (!client) return res.status(404).json({ message: 'Client not found' });
+        // Get interest rate
+        let interestRate = 0;
 
-        // Get client interest rate
-        const interestRate = parseFloat(client.interestRate) / 100 || 0; // Convert to decimal
+        if (clientId) {
+            const client = await ClientBrief.findById(clientId);
+            if (!client) return res.status(404).json({ message: 'Client not found' });
+            interestRate = parseFloat(client.interestRate) / 100;
+        } else if (manualInterestRate) {
+            interestRate = parseFloat(manualInterestRate) / 100;
+        } else {
+            return res.status(400).json({ message: 'No interest rate provided' });
+        }
 
         // Calculate mortgage interest only payment
         const annualMortgageInterestOnly = Math.round(parsedLoanAmount * interestRate);

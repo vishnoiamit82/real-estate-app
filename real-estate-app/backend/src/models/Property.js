@@ -23,6 +23,7 @@ const PropertySchema = new mongoose.Schema({
     yearBuilt: { type: String, trim: true },
     features: [{ type: String }], // Array of features
     councilRate: { type: String, trim: true },
+    councilRateNum: { type: Number },
     insurance: { type: String, trim: true },
     floodZone: { type: String, trim: true },
     bushfireZone: { type: String, trim: true },
@@ -32,7 +33,7 @@ const PropertySchema = new mongoose.Schema({
     marketTrends: { type: String, trim: true },
     tags: [{
         name: { type: String, required: true },
-        type: { type: String, enum: ['location', 'feature', 'propertyType', 'region', 'user', 'other'], required: true }
+        type: { type: String, enum: ['location', 'feature', 'propertyType', 'region', 'user', 'other', 'suburb', 'state'], required: true }
       }],
 
     mapsLink: { type: String, trim: true },

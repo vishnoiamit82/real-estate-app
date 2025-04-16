@@ -11,7 +11,7 @@ const tagSchema = new mongoose.Schema(
     type: {
       type: String,
       required: true,
-      enum: ['location', 'feature', 'propertyType', 'region','username'],
+      enum: ['location', 'feature', 'propertyType', 'region','username','suburb', 'state'],
     },
   },
   {

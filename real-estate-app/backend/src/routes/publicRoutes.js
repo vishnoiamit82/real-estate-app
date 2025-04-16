@@ -327,6 +327,97 @@ router.get('/ping', async (req, res) => {
 });
 
 
+// GET /public/property/summary
+router.get('/property/summary', async (req, res) => {
+  try {
+    const dayjs = require('dayjs');
+    const Property = require('../models/Property');
+
+    const start = dayjs().startOf('day').toDate();
+    const end = dayjs().endOf('day').toDate();
+
+    const properties = await Property.find({
+      isCommunityShared: true,
+      createdAt: { $gte: start, $lte: end }
+    });
+
+    const total = properties.length;
+    const suburbMap = {};
+    const tagCount = {};
+
+    for (const prop of properties) {
+      const tags = prop.tags || [];
+      const suburbTag = tags.find(tag => tag.type === 'suburb');
+      const suburb = suburbTag?.name || 'Unknown';
+
+      if (!suburbMap[suburb]) {
+        suburbMap[suburb] = {
+          count: 0,
+          priceMins: [],
+          priceMaxs: [],
+          rents: []
+        };
+      }
+
+      suburbMap[suburb].count += 1;
+
+      if (typeof prop.askingPriceMin === 'number') {
+        suburbMap[suburb].priceMins.push(prop.askingPriceMin);
+      }
+      if (typeof prop.askingPriceMax === 'number') {
+        suburbMap[suburb].priceMaxs.push(prop.askingPriceMax);
+      }
+      if (typeof prop.rentPerWeek === 'number') {
+        suburbMap[suburb].rents.push(prop.rentPerWeek);
+      }
+
+      // Track non-location tags
+      for (const tag of tags) {
+        if (!['suburb', 'region', 'state'].includes(tag.type)) {
+          tagCount[tag.name] = (tagCount[tag.name] || 0) + 1;
+        }
+      }
+    }
+
+    const suburbs = Object.entries(suburbMap).map(([name, data]) => ({
+      name,
+      count: data.count,
+      priceRange: data.priceMins.length && data.priceMaxs.length
+        ? {
+            min: Math.min(...data.priceMins),
+            max: Math.max(...data.priceMaxs)
+          }
+        : null,
+      rentRange: data.rents.length
+        ? {
+            min: Math.min(...data.rents),
+            max: Math.max(...data.rents)
+          }
+        : null
+    }));
+
+    const topTags = Object.entries(tagCount)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count }));
+
+    const topSuburbs = suburbs
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);  
+
+    return res.status(200).json({
+      total,
+      suburbs,
+      topTags,
+      topSuburbs
+    });
+  } catch (err) {
+    console.error("❌ Error in /property/summary:", err);
+    res.status(500).json({ message: 'Failed to generate summary' });
+  }
+});
+
+
 
 
 

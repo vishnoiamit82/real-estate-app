@@ -39,6 +39,7 @@ const publicRoutes = require('./routes/publicRoutes');
 const adminQueriesRoutes = require('./routes/adminQueriesRoutes');
 const tagsRoutes = require('./routes/tagsRoutes');
 const communityMessagesRoutes = require('./routes/communityMessagesRoutes');
+const rateLimit = require('express-rate-limit');
 
 
 
@@ -88,6 +89,17 @@ app.use(sanitizeResponseMiddleware);
 app.use(loggerMiddleware); 
 
 
+
+const publicLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 mins
+    max: 100, // max 100 requests per IP
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: 'Too many requests. Please try again later.',
+  });
+  
+
+
 // ✅ Database connection
 mongoose
     .connect(process.env.MONGO_URI, {
@@ -98,9 +110,20 @@ mongoose
     .catch((err) => console.error('❌ MongoDB connection error:', err));
 
 // ✅ Public routes (No authentication required)
-app.use('/api/login', loginRoute);
-app.use('/api/signup', usersSignupRoutes);
-app.use('/api/shared', sharedPropertyRoute);
+app.use('/api/login', publicLimiter,loginRoute);
+app.use('/api/signup', publicLimiter, usersSignupRoutes);
+app.use('/api/shared', publicLimiter, sharedPropertyRoute);
+app.use('/api/public', publicLimiter, publicRoutes);
+app.use('/api/forgot-password', publicLimiter,forgotPasswordRoutes);
+app.use('/api/reset-password',publicLimiter, resetPasswordRoutes);
+app.use('/api/auth',publicLimiter, authRoutes);
+app.use('/api/cashflow', publicLimiter, cashFlowRoutes);
+
+// ✅ Default route for health check
+app.get('/', publicLimiter, (req, res) => {
+    res.send('✅ API is working!');
+});
+
 
 
 // ✅ Protected routes (Require authentication)
@@ -114,45 +137,27 @@ app.use('/api/properties', (req, res, next) => {
     return authMiddleware(req, res, next);
   }, propertyRoutes);
 
-// Public AI search
-app.use('/api/public', publicRoutes);
 
 // Protected processing
 app.use('/api/process-description', authMiddleware, processDescriptionRoutes);
-
 app.use('/api/client-briefs', authMiddleware, clientBriefRoutes);
 app.use('/api/buyers-agents', authMiddleware, buyersAgentRoutes);
 app.use('/api/follow-up-tasks', authMiddleware, taskRoutes);
-app.use('/api/cashflow', authMiddleware, cashFlowRoutes);
+
 app.use('/api/send-email', authMiddleware, sendGridRoutes);
 app.use('/api/email-templates', authMiddleware, emailTemplatesRoutes);
 app.use('/api/users', authMiddleware, userRoutes);
+app.use('/api/saved-properties', authMiddleware, savedPropertyRoutes);
+app.use('/api/ai-search-queries', authMiddleware, adminQueriesRoutes);
+app.use('/api/tags',authMiddleware, tagsRoutes);
+app.use('/api/community-messages', authMiddleware, communityMessagesRoutes);
+app.use('/api/property-conversations', authMiddleware, propertyConversationRoute);
 
-app.use('/api/forgot-password', forgotPasswordRoutes);
-app.use('/api/reset-password', resetPasswordRoutes);
-app.use('/api/auth', authRoutes);
+
 app.use('/api/email-replies', emailRepliesRoutes);
 
 
-app.use('/api/saved-properties', authMiddleware, savedPropertyRoutes);
 
-app.use('/api/property-conversations', propertyConversationRoute);
-app.use('/api/ai-search-queries', authMiddleware, adminQueriesRoutes);
-app.use('/api/tags',authMiddleware, tagsRoutes);
-
-app.use('/api/community-messages', authMiddleware, communityMessagesRoutes);
-
-
-
-
-
-
-
-
-// ✅ Default route for health check
-app.get('/', (req, res) => {
-    res.send('✅ API is working!');
-});
 
 // ✅ Handle 404 Errors for undefined routes
 app.use((req, res) => {

@@ -270,12 +270,13 @@ router.post('/', authMiddleware, authorize(['view_property']), async (req, res) 
 
 
         // Extract and calculate numeric values from free-text fields
-        const { askingPrice, rental, rentalYield, landSize, yearBuilt } = req.body;
+        const { askingPrice, rental, rentalYield, landSize, yearBuilt, councilRate } = req.body;
         const { min, max } = parsePriceRange(askingPrice || '');
         const rentPerWeek = parseRent(rental || '');
         const rentalYieldPercent = parseYield(rentalYield || '');
         const landSizeNumeric = extractSingleNumber(landSize || '')
         const yearBuiltNumeric = extractSingleNumber(yearBuilt || '')
+        const councilRateNum =extractSingleNumber(councilRate || '')
 
         // Sanitize incoming data and attach the logged-in user's id as createdBy
         const sanitizedData = {
@@ -297,7 +298,8 @@ router.post('/', authMiddleware, authorize(['view_property']), async (req, res) 
             rentPerWeek,
             rentalYieldPercent,
             landSizeNumeric,
-            yearBuiltNumeric
+            yearBuiltNumeric,
+            councilRateNum
         };
 
         // Create new property

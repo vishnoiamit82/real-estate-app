@@ -91,9 +91,9 @@ router.post('/', async (req, res) => {
             `;
 
 
-            // - tags: Return tags only from this list if mentioned:  
-            // ["Recently Renovated", "Needs Renovation", "Subdivision Potential", "Plans & Permits", "Granny Flat", "Dual Living", "Zoned for Development"]
-            // Return only exact matches from list if directly stated in the description. Do not infer tags unless mentioned explicitly.
+        // - tags: Return tags only from this list if mentioned:  
+        // ["Recently Renovated", "Needs Renovation", "Subdivision Potential", "Plans & Permits", "Granny Flat", "Dual Living", "Zoned for Development"]
+        // Return only exact matches from list if directly stated in the description. Do not infer tags unless mentioned explicitly.
 
 
         // Call OpenAI API
@@ -105,7 +105,7 @@ router.post('/', async (req, res) => {
                     { role: 'system', content: 'You are a helpful assistant that extracts structured property details.' },
                     { role: 'user', content: prompt }
                 ],
-                max_tokens: 500,
+                max_tokens: 1500,
                 temperature: 0.5
             },
             {
@@ -122,8 +122,49 @@ router.post('/', async (req, res) => {
 
         generatedText = generatedText.replace(/```json|```/g, ''); // Remove ```json markers
 
+
+
         try {
-            const structuredData = JSON.parse(generatedText);
+            let structuredData = tryParseJSON(generatedText);
+
+            if (!structuredData) {
+                // Reprompt
+                const retryPrompt = `The previous response was not valid JSON. Please return the corrected, valid JSON only.`;
+
+                const retryResponse = await axios.post(
+                    'https://api.openai.com/v1/chat/completions',
+                    {
+                        model: 'gpt-3.5-turbo',
+                        messages: [
+                            { role: 'system', content: 'You are a helpful assistant that extracts structured property data.' },
+                            { role: 'user', content: prompt },
+                            { role: 'assistant', content: generatedText }, // original output
+                            { role: 'user', content: retryPrompt }
+                        ],
+                        temperature: 0,
+                        max_tokens: 1500
+                    },
+                    {
+                        headers: {
+                            'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+                            'Content-Type': 'application/json'
+                        }
+                    }
+                );
+
+                const retryText = retryResponse.data.choices[0].message.content.replace(/```json|```/g, '');
+                structuredData = tryParseJSON(retryText);
+
+                if (!structuredData) {
+                    console.warn('🛑 Second attempt also failed. Returning raw text.');
+                    return res.status(200).json({
+                        structuredData: null,
+                        warning: 'OpenAI returned unparseable output after retry.',
+                        rawResponse: retryText
+                    });
+                }
+            }
+
 
             // structuredData.tags = generateTagsFromStructuredData(structuredData);
 
@@ -139,7 +180,7 @@ router.post('/', async (req, res) => {
                     structuredData.rentalYield = ""; // Ensure rental yield is not incorrectly set
                 } else {
                     // Detect if rental is weekly or monthly
-                    const isWeeklyRent = /week|pw|wk/i.test(structuredData.rental); // Looks for 'week', 'pw', 'wk'
+                    const isWeeklyRent = /week|w|pw|wk/i.test(structuredData.rental); // Looks for 'week', 'pw', 'wk'
                     const annualRent = isWeeklyRent ? rent * 52 : rent * 12; // Adjust for weekly rent
 
                     if (!isNaN(price) && price > 0) {
@@ -194,6 +235,20 @@ router.post('/', async (req, res) => {
 });
 
 
+function tryParseJSON(raw) {
+    try {
+        const jsonStart = raw.indexOf('{');
+        const jsonEnd = raw.lastIndexOf('}');
+        if (jsonStart === -1 || jsonEnd === -1) return null;
+
+        const clean = raw.slice(jsonStart, jsonEnd + 1);
+        return JSON.parse(clean);
+    } catch (e) {
+        return null;
+    }
+}
+
+
 function generateTagsFromStructuredData(data) {
     const tags = [];
 
@@ -232,16 +287,16 @@ function generateTagsFromStructuredData(data) {
 
 function buildRegexFilter(field, values) {
     if (!Array.isArray(values)) {
-      return { [field]: { $regex: values, $options: 'i' } };
+        return { [field]: { $regex: values, $options: 'i' } };
     }
-  
+
     return {
-      $or: values.map(v => ({
-        [field]: { $regex: v, $options: 'i' }
-      }))
+        $or: values.map(v => ({
+            [field]: { $regex: v, $options: 'i' }
+        }))
     };
-  }
-  
+}
+
 
 
 
