@@ -1,17 +1,14 @@
 const dotenv = require("dotenv");
 
-
 console.log("✅ NODE_ENV:", process.env.NODE_ENV);
-
 
 // Load environment-specific `.env` file
 if (process.env.NODE_ENV === "production") {
-    dotenv.config({ path: ".env.production" });
-} else if(process.env.NODE_ENV === "test"){
-    dotenv.config({ path: ".env.test" });
-}
-else {
-    dotenv.config({ path: ".env.local" });
+    dotenv.config({ path: "../.env.production" });
+} else if (process.env.NODE_ENV === "test") {
+    dotenv.config({ path: "../.env.test" });
+} else {
+    dotenv.config({ path: "../.env.local" });
 }
 
 // Load environment variables
@@ -40,35 +37,49 @@ if (!filePath) {
 // Function to parse and upload/update data
 const importAgents = async () => {
     const agents = [];
+    const emailsInFile = new Set();
 
     fs.createReadStream(filePath)
         .pipe(csvParser())
         .on('data', (row) => {
+            const email = row['Contact Email']?.trim().toLowerCase();
+            if (!email) return;
+
             const agent = {
                 name: `${row['First Name']} ${row['Last Name']}`.trim(),
-                email: row['Contact Email'],
-                phoneNumber: row['Mobile'] || row['Phone'] || null, // Use Mobile first, else Phone
-                agencyName: row['Company Name'] || '', // Add agency name if present
-                region: row['City'] || '' // Add region if present
+                email: email,
+                phoneNumber: row['Mobile'] || row['Phone'] || null,
+                agencyName: row['Company Name'] || '',
+                region: row['City'] || ''
             };
+
             agents.push(agent);
+            emailsInFile.add(email);
         })
         .on('end', async () => {
             try {
+                const existingAgents = await Agent.find({}, 'email');
+                const existingEmails = new Set(existingAgents.map(a => a.email.toLowerCase()));
+
                 for (const agent of agents) {
-                    if (agent.email) {
-                        // Find agent by email and update if exists, otherwise insert
-                        await Agent.findOneAndUpdate(
-                            { email: agent.email }, // Search by email
-                            agent, // Update agent data
-                            { upsert: true, new: true, setDefaultsOnInsert: true }
-                        );
-                    }
+                    await Agent.findOneAndUpdate(
+                        { email: agent.email },
+                        agent,
+                        { upsert: true, new: true, setDefaultsOnInsert: true }
+                    );
                 }
-                console.log('Agents successfully uploaded or updated.');
+
+                const missingFromFile = [...existingEmails].filter(email => !emailsInFile.has(email));
+
+                if (missingFromFile.length > 0) {
+                    console.log("⚠️ Agents in database but not in CSV:");
+                    missingFromFile.forEach(email => console.log(`- ${email}`));
+                }
+
+                console.log('✅ Agents successfully uploaded/updated.');
                 mongoose.connection.close();
             } catch (error) {
-                console.error('Error inserting/updating agents:', error);
+                console.error('❌ Error inserting/updating agents:', error);
                 mongoose.connection.close();
             }
         });
